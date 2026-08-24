@@ -16,4 +16,6 @@
 - When a "commit and PR" is requested we PR to 'dev' from a feature branch. If you are not sure, ask before committing.
 - Often a user will forget to save the edits before requesting the commit. Remind us if you think we missed saving.
 - Ensure that the commit message is clear and concise. 
+- We should not be committing directly to the `dev` branch. If a commit is requested via a dev branch ask first before committing to it. This is to ensure that the changes are properly tested and reviewed before being merged into the main development branch.
+
 
