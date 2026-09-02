@@ -33,8 +33,14 @@ class ViewportController extends ChangeNotifier {
       final (min, max) = frame.getMinMax();
       final double modMin = frame.getModalityValue(min.toInt());
       final double modMax = frame.getModalityValue(max.toInt());
-      _windowWidth = (modMax - modMin).abs();
-      _windowCenter = modMin + (_windowWidth / 2.0);
+      final computedWidth = (modMax - modMin).abs();
+      if (computedWidth > 1.0) {
+        _windowWidth = computedWidth;
+        _windowCenter = modMin + (_windowWidth / 2.0);
+      } else {
+        _windowCenter = 2048.0;
+        _windowWidth = 4096.0;
+      }
       _activePreset = null;
     }
     notifyListeners();

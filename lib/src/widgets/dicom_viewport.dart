@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../imaging/pixel_frame.dart';
@@ -83,18 +84,18 @@ class _DicomViewportState extends State<DicomViewport> {
       windowWidth: width,
     );
 
-    final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(rgbaBytes);
-    final ui.ImageDescriptor descriptor = ui.ImageDescriptor.raw(
-      buffer,
-      width: frame.width,
-      height: frame.height,
-      rowBytes: frame.width * 4,
-      pixelFormat: ui.PixelFormat.rgba8888,
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      rgbaBytes,
+      frame.width,
+      frame.height,
+      ui.PixelFormat.rgba8888,
+      (ui.Image img) {
+        completer.complete(img);
+      },
     );
 
-    final ui.Codec codec = await descriptor.instantiateCodec();
-    final ui.FrameInfo frameInfo = await codec.getNextFrame();
-    final ui.Image newImage = frameInfo.image;
+    final ui.Image newImage = await completer.future;
 
     if (mounted) {
       setState(() {
