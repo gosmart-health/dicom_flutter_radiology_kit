@@ -20,8 +20,9 @@ if (typeof exports === 'object' && typeof module === 'object') {
   module.exports.default = OpenJPEGWASM;
 } else if (typeof define === 'function' && define['amd'])
   define([], () => OpenJPEGWASM);
-
 (function(global) {
+  'use strict';
+
   var _globalDecoderInstance = null;
   var _globalModulePromise = null;
 
@@ -30,7 +31,7 @@ if (typeof exports === 'object' && typeof module === 'object') {
       if (typeof OpenJPEGWASM === 'function') {
         _globalModulePromise = OpenJPEGWASM({
           locateFile: function(path) {
-            if (path.indexOf('.wasm') !== -1) {
+            if (path && path.indexOf('.wasm') !== -1) {
               return 'openjpegwasm.wasm';
             }
             return path;
@@ -52,27 +53,105 @@ if (typeof exports === 'object' && typeof module === 'object') {
         throw new Error('J2KDecoder initialization failed');
       }
 
-      var input = (encodedBytes instanceof Uint8Array) ? encodedBytes : new Uint8Array(encodedBytes);
-      var encBuf = _globalDecoderInstance.getEncodedBuffer(input.length);
+      var len = encodedBytes.length || 0;
+      var input = new Uint8Array(len);
+      for (var i = 0; i < len; i++) {
+        input[i] = encodedBytes[i];
+      }
+
+      var encBuf = _globalDecoderInstance.getEncodedBuffer(len);
       encBuf.set(input);
       _globalDecoderInstance.decode();
 
       var frameInfo = _globalDecoderInstance.getFrameInfo();
       var rawBytes = _globalDecoderInstance.getDecodedBuffer();
 
-      var copy = new Uint8Array(rawBytes.length);
-      copy.set(rawBytes);
+      var outWidth = (frameInfo && frameInfo.width) || width || 512;
+      var outHeight = (frameInfo && frameInfo.height) || height || 512;
+      var outSigned = (frameInfo && frameInfo.isSigned !== undefined) ? frameInfo.isSigned : isSigned;
+      var is16 = (frameInfo && frameInfo.bitsPerSample && frameInfo.bitsPerSample > 8) || (bitsAllocated > 8);
 
-      return {
-        pixelData: copy,
-        width: (frameInfo && frameInfo.width) || width || 512,
-        height: (frameInfo && frameInfo.height) || height || 512,
-        isSigned: (frameInfo && frameInfo.isSigned !== undefined) ? frameInfo.isSigned : isSigned,
-        bitsAllocated: (frameInfo && frameInfo.bitsPerSample && frameInfo.bitsPerSample > 8) ? 16 : (bitsAllocated || 16)
-      };
+      if (is16) {
+        var u16 = new Uint16Array(rawBytes.buffer, rawBytes.byteOffset, rawBytes.length / 2);
+        var copy16 = new Uint16Array(u16.length);
+        for (var k = 0; k < u16.length; k++) {
+          copy16[k] = u16[k];
+        }
+        return {
+          pixelData16: copy16,
+          width: outWidth,
+          height: outHeight,
+          isSigned: outSigned,
+          bitsAllocated: 16
+        };
+      } else {
+        var copy8 = new Uint8Array(rawBytes.length);
+        for (var j = 0; j < rawBytes.length; j++) {
+          copy8[j] = rawBytes[j];
+        }
+        return {
+          pixelData8: copy8,
+          width: outWidth,
+          height: outHeight,
+          isSigned: false,
+          bitsAllocated: 8
+        };
+      }
+    });
+  }
+
+  function decodeJpegBaseline(encodedBytes, width, height) {
+    return new Promise(function(resolve, reject) {
+      try {
+        var len = encodedBytes.length || 0;
+        var input = new Uint8Array(len);
+        for (var i = 0; i < len; i++) {
+          input[i] = encodedBytes[i];
+        }
+
+        var blob = new Blob([input], { type: 'image/jpeg' });
+        if (typeof createImageBitmap === 'function') {
+          createImageBitmap(blob).then(function(bmp) {
+            var canvas = (typeof OffscreenCanvas !== 'undefined')
+              ? new OffscreenCanvas(bmp.width, bmp.height)
+              : (typeof document !== 'undefined' ? document.createElement('canvas') : null);
+            
+            if (!canvas) {
+              reject(new Error('Canvas context not available for JPEG decoding'));
+              return;
+            }
+
+            canvas.width = bmp.width;
+            canvas.height = bmp.height;
+            var ctx = canvas.getContext('2d');
+            ctx.drawImage(bmp, 0, 0);
+            var imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
+
+            var numPixels = bmp.width * bmp.height;
+            var out = new Uint8Array(numPixels);
+            var data = imgData.data;
+            for (var j = 0; j < numPixels; j++) {
+              out[j] = data[j * 4];
+            }
+            if (bmp.close) bmp.close();
+            resolve({
+              pixelData8: out,
+              width: bmp.width,
+              height: bmp.height,
+              isSigned: false,
+              bitsAllocated: 8
+            });
+          }).catch(reject);
+        } else {
+          reject(new Error('createImageBitmap not supported in current environment'));
+        }
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
   global.decodeJpeg2000 = decodeJpeg2000;
+  global.decodeJpegBaseline = decodeJpegBaseline;
   global.initOpenJpeg = initOpenJpeg;
 })(typeof self !== 'undefined' ? self : this);

@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:js_interop';
-import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
 import 'decoder_interface.dart';
 
 @JS('decodeJpeg2000')
-external JSPromise<JSObject>? _decodeJpeg2000Js(
+external JSPromise<J2kDecodeResultJs> decodeJpeg2000Js(
   JSUint8Array encodedBytes,
   JSNumber width,
   JSNumber height,
@@ -13,82 +12,98 @@ external JSPromise<JSObject>? _decodeJpeg2000Js(
   JSNumber bitsAllocated,
 );
 
-/// Web Worker / WASM bridge for decoding JPEG 2000 bitstreams via OpenJPEG.
+@JS('decodeJpegBaseline')
+external JSPromise<J2kDecodeResultJs> decodeJpegBaselineJs(
+  JSUint8Array encodedBytes,
+  JSNumber width,
+  JSNumber height,
+);
+
+extension type J2kDecodeResultJs(JSObject _) implements JSObject {
+  external JSUint16Array? get pixelData16;
+  external JSUint8Array? get pixelData8;
+  external JSNumber get width;
+  external JSNumber get height;
+  external JSBoolean get isSigned;
+  external JSNumber get bitsAllocated;
+}
+
+/// Web Worker / WASM bridge for decoding JPEG 2000 and JPEG bitstreams via OpenJPEG.
 class WasmWorkerBridge implements FrameDecoder {
   Future<void> initialize() async {}
 
   @override
   Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options) async {
     try {
-      if (globalContext.hasProperty('decodeJpeg2000'.toJS).toDart) {
-        final promise = _decodeJpeg2000Js(
-          encodedBytes.toJS,
-          options.width.toJS,
-          options.height.toJS,
-          options.isSigned.toJS,
-          options.bitsAllocated.toJS,
-        );
+      final promise = decodeJpeg2000Js(
+        encodedBytes.toJS,
+        options.width.toJS,
+        options.height.toJS,
+        options.isSigned.toJS,
+        options.bitsAllocated.toJS,
+      );
 
-        if (promise != null) {
-          final jsResult = await promise.toDart;
-          final jsPixelData = jsResult.getProperty('pixelData'.toJS) as JSUint8Array;
-          final dartBytes = jsPixelData.toDart;
+      final jsResult = await promise.toDart;
+      final width = jsResult.width.toDartInt;
+      final height = jsResult.height.toDartInt;
+      final isSigned = jsResult.isSigned.toDart;
+      final bitsAllocated = jsResult.bitsAllocated.toDartInt;
 
-          final width = (jsResult.getProperty('width'.toJS) as JSNumber?)?.toDartInt ?? options.width;
-          final height = (jsResult.getProperty('height'.toJS) as JSNumber?)?.toDartInt ?? options.height;
-          final bitsAllocated = (jsResult.getProperty('bitsAllocated'.toJS) as JSNumber?)?.toDartInt ?? options.bitsAllocated;
-          final isSigned = (jsResult.getProperty('isSigned'.toJS) as JSBoolean?)?.toDart ?? options.isSigned;
-
-          final numPixels = width * height;
-          final TypedData pixels;
-
-          if (bitsAllocated == 16) {
-            final bd = ByteData.sublistView(dartBytes);
-            final count = (dartBytes.lengthInBytes ~/ 2).clamp(0, numPixels);
-            if (isSigned) {
-              final int16List = Int16List(numPixels);
-              for (int i = 0; i < count; i++) {
-                int16List[i] = bd.getInt16(i * 2, Endian.little);
-              }
-              pixels = int16List;
-            } else {
-              final uint16List = Uint16List(numPixels);
-              for (int i = 0; i < count; i++) {
-                uint16List[i] = bd.getUint16(i * 2, Endian.little);
-              }
-              pixels = uint16List;
-            }
-          } else {
-            pixels = Uint8List.fromList(dartBytes);
-          }
-
-          return DecodeResult(
-            pixelData: pixels,
-            width: width,
-            height: height,
-            bitsAllocated: bitsAllocated,
-            bitsStored: bitsAllocated <= 8 ? 8 : 12,
-            isSigned: isSigned,
-          );
-        }
+      final TypedData pixels;
+      if (jsResult.pixelData16 != null) {
+        pixels = jsResult.pixelData16!.toDart;
+      } else if (jsResult.pixelData8 != null) {
+        pixels = jsResult.pixelData8!.toDart;
+      } else {
+        pixels = Uint16List(width * height);
       }
-    } catch (_) {
-      // Fallback
+
+      return DecodeResult(
+        pixelData: pixels,
+        width: width,
+        height: height,
+        bitsAllocated: bitsAllocated,
+        bitsStored: bitsAllocated <= 8 ? 8 : 12,
+        isSigned: isSigned,
+      );
+    } catch (e) {
+      throw Exception('Failed to decode JPEG 2000 frame: $e');
     }
+  }
 
-    final numPixels = options.width * options.height;
-    final TypedData pixels = options.bitsAllocated == 16
-        ? (options.isSigned ? Int16List(numPixels) : Uint16List(numPixels))
-        : Uint8List(numPixels);
+  /// Helper for decoding JPEG Baseline on Web using browser native decoding.
+  Future<DecodeResult> decodeJpeg(Uint8List encodedBytes, DecodeOptions options) async {
+    try {
+      final promise = decodeJpegBaselineJs(
+        encodedBytes.toJS,
+        options.width.toJS,
+        options.height.toJS,
+      );
 
-    return DecodeResult(
-      pixelData: pixels,
-      width: options.width,
-      height: options.height,
-      bitsAllocated: options.bitsAllocated,
-      bitsStored: options.bitsStored,
-      isSigned: options.isSigned,
-    );
+      final jsResult = await promise.toDart;
+      final width = jsResult.width.toDartInt;
+      final height = jsResult.height.toDartInt;
+
+      final TypedData pixels;
+      if (jsResult.pixelData8 != null) {
+        pixels = jsResult.pixelData8!.toDart;
+      } else if (jsResult.pixelData16 != null) {
+        pixels = jsResult.pixelData16!.toDart;
+      } else {
+        pixels = Uint8List(width * height);
+      }
+
+      return DecodeResult(
+        pixelData: pixels,
+        width: width,
+        height: height,
+        bitsAllocated: 8,
+        bitsStored: 8,
+        isSigned: false,
+      );
+    } catch (e) {
+      throw Exception('Failed to decode JPEG frame: $e');
+    }
   }
 
   void dispose() {}

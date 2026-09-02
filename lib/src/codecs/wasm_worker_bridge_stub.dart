@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'decoder_interface.dart';
 
 /// VM / Non-browser fallback for WasmWorkerBridge.
@@ -23,7 +24,6 @@ class WasmWorkerBridge implements FrameDecoder {
     }
 
     if (encodedBytes.length > socOffset + 2 && encodedBytes[socOffset] == 0xFF && encodedBytes[socOffset + 1] == 0x4F) {
-      // Decompress J2K entropy stream into 16-bit scalar array
       if (options.bitsAllocated == 16) {
         if (options.isSigned) {
           final list = Int16List(numPixels);
@@ -101,6 +101,41 @@ class WasmWorkerBridge implements FrameDecoder {
       bitsStored: options.bitsStored,
       isSigned: options.isSigned,
     );
+  }
+
+  Future<DecodeResult> decodeJpeg(Uint8List encodedBytes, DecodeOptions options) async {
+    try {
+      final codec = await ui.instantiateImageCodec(encodedBytes);
+      final frameInfo = await codec.getNextFrame();
+      final image = frameInfo.image;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+      final width = image.width;
+      final height = image.height;
+      final numPixels = width * height;
+
+      if (byteData == null) {
+        return decodeFrame(encodedBytes, options);
+      }
+
+      final list = Uint8List(numPixels);
+      for (int i = 0; i < numPixels; i++) {
+        list[i] = byteData.getUint8(i * 4);
+      }
+
+      image.dispose();
+
+      return DecodeResult(
+        pixelData: list,
+        width: width,
+        height: height,
+        bitsAllocated: 8,
+        bitsStored: 8,
+        isSigned: false,
+      );
+    } catch (_) {
+      return decodeFrame(encodedBytes, options);
+    }
   }
 
   void dispose() {}

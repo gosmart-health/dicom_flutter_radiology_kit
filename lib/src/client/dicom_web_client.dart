@@ -216,8 +216,8 @@ class DicomWebClient {
         compressionMode: compressionMode,
       );
 
-      // Inject negotiated transfer syntax if not explicitly in metadata
-      final effectiveTransferSyntax = inst.transferSyntaxUID ?? compressionMode.transferSyntaxUID;
+      // Use negotiated transfer syntax from WADO request
+      final effectiveTransferSyntax = compressionMode.transferSyntaxUID;
       final updatedMetadata = DicomInstanceSummary(
         sopInstanceUID: inst.sopInstanceUID,
         sopClassUID: inst.sopClassUID,

@@ -60,7 +60,7 @@ enum DicomCompressionMode {
       'multipart/related; type="$mediaType"; transfer-syntax="$transferSyntaxUID", $mediaType, application/octet-stream';
 }
 
-/// Dispatcher routing frames to decoders based on DICOM Transfer Syntax UID.
+/// Dispatcher routing frames to decoders based on bitstream signature and DICOM Transfer Syntax UID.
 class CodecRouter {
   static final WasmWorkerBridge _wasmWorkerBridge = WasmWorkerBridge();
 
@@ -69,11 +69,18 @@ class CodecRouter {
     required Uint8List frameBytes,
     required DecodeOptions options,
   }) async {
-    switch (transferSyntaxUID) {
-      case DicomTransferSyntaxes.implicitVRLittleEndian:
-      case DicomTransferSyntaxes.explicitVRLittleEndian:
-        return _decodeUncompressed(frameBytes, options);
+    // 1. Check magic bytes first (most reliable detection)
+    if (frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0xD8) {
+      return await _decodeJpegBaseline(frameBytes, options);
+    }
 
+    if ((frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0x4F) ||
+        (frameBytes.length >= 12 && frameBytes[4] == 0x6A && frameBytes[5] == 0x50)) {
+      return await _wasmWorkerBridge.decodeFrame(frameBytes, options);
+    }
+
+    // 2. Dispatch based on Transfer Syntax UID
+    switch (transferSyntaxUID) {
       case DicomTransferSyntaxes.rleLossless:
         return _decodeRle(frameBytes, options);
 
@@ -87,16 +94,9 @@ class CodecRouter {
       case DicomTransferSyntaxes.htj2kLossy:
         return await _wasmWorkerBridge.decodeFrame(frameBytes, options);
 
+      case DicomTransferSyntaxes.implicitVRLittleEndian:
+      case DicomTransferSyntaxes.explicitVRLittleEndian:
       default:
-        // Check if magic bytes start with JPEG SOI (0xFF, 0xD8)
-        if (frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0xD8) {
-          return await _decodeJpegBaseline(frameBytes, options);
-        }
-        // Check if magic bytes start with J2K SOC (0xFF, 0x4F) or JP2 signature
-        if ((frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0x4F) ||
-            (frameBytes.length >= 12 && frameBytes[4] == 0x6A && frameBytes[5] == 0x50)) {
-          return await _wasmWorkerBridge.decodeFrame(frameBytes, options);
-        }
         return _decodeUncompressed(frameBytes, options);
     }
   }
@@ -116,38 +116,27 @@ class CodecRouter {
       final height = image.height;
       final numPixels = width * height;
 
-      if (byteData == null) {
-        return _decodeUncompressed(bytes, options);
-      }
-
-      final TypedData pixels;
-      if (options.bitsAllocated == 16) {
-        final list = Uint16List(numPixels);
-        for (int i = 0; i < numPixels; i++) {
-          list[i] = byteData.getUint8(i * 4); // Extract red/luminance channel
-        }
-        pixels = list;
-      } else {
+      if (byteData != null) {
         final list = Uint8List(numPixels);
         for (int i = 0; i < numPixels; i++) {
           list[i] = byteData.getUint8(i * 4);
         }
-        pixels = list;
+
+        image.dispose();
+
+        return DecodeResult(
+          pixelData: list,
+          width: width,
+          height: height,
+          bitsAllocated: 8,
+          bitsStored: 8,
+          isSigned: false,
+        );
       }
-
       image.dispose();
+    } catch (_) {}
 
-      return DecodeResult(
-        pixelData: pixels,
-        width: width,
-        height: height,
-        bitsAllocated: options.bitsAllocated,
-        bitsStored: options.bitsStored <= 8 ? 8 : options.bitsStored,
-        isSigned: options.isSigned,
-      );
-    } catch (_) {
-      return _decodeUncompressed(bytes, options);
-    }
+    return await _wasmWorkerBridge.decodeJpeg(bytes, options);
   }
 
   static DecodeResult _decodeUncompressed(Uint8List bytes, DecodeOptions options) {

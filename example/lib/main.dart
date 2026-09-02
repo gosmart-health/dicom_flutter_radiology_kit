@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:dicom_web_kit/dicom_web_kit.dart';
 import 'fixtures/synthetic_patterns.dart';
@@ -121,13 +122,19 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           _selectedFixture = 'QIDO: ${seriesBuffer.series.seriesDescription}';
         });
 
-        final metaCenter = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowCenter : null;
-        final metaWidth = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowWidth : null;
-        if (metaCenter != null && metaWidth != null && metaWidth > 1.0) {
-          _controller.setWindowLevel(metaCenter, metaWidth);
+        final is8Bit = initialFrame.bitsAllocated <= 8 || initialFrame.rawPixels is Uint8List;
+        if (is8Bit) {
+          _controller.setWindowLevel(128.0, 256.0);
           _controller.setFrame(initialFrame, updateWindowLevelFromFrame: false);
         } else {
-          _controller.setFrame(initialFrame, updateWindowLevelFromFrame: true);
+          final metaCenter = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowCenter : null;
+          final metaWidth = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowWidth : null;
+          if (metaCenter != null && metaWidth != null && metaWidth > 1.0) {
+            _controller.setWindowLevel(metaCenter, metaWidth);
+            _controller.setFrame(initialFrame, updateWindowLevelFromFrame: false);
+          } else {
+            _controller.setFrame(initialFrame, updateWindowLevelFromFrame: true);
+          }
         }
         _controller.updateMetadata(
           patientName: seriesBuffer.study?.patientName ?? 'Anonymous',
