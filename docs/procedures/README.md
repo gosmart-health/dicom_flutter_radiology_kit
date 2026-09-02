@@ -1,6 +1,6 @@
 # Standard Operating Procedures (SOPs)
 
-This directory contains the formal Quality Management System (QMS) Standard Operating Procedures for `dicom_web_kit`, aligned with **IEC 62304:2006+A1:2015**, **ISO 13485:2016 Clause 7.3**, and **FDA 21 CFR 820.30**.
+This directory contains the formal Quality Management System (QMS) Standard Operating Procedures for `dicom_flutter_radiology_kit`, aligned with **IEC 62304:2006+A1:2015**, **ISO 13485:2016 Clause 7.3**, and **FDA 21 CFR 820.30**.
 
 ---
 

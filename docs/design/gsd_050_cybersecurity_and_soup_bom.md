@@ -1,13 +1,13 @@
 # Cybersecurity Profile & Software Bill of Materials (SBOM)
 
 **Document ID:** SEC-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** FDA Cybersecurity in Medical Devices Guidance (2023), IEC 62304 SOUP Evaluation  
 
 ---
 
 ## 1. Executive Summary & Security Model
-This document details the Software Bill of Materials (SBOM), SOUP (Software of Unknown Provenance) risk management, cybersecurity controls, and privacy safeguards for `dicom_web_kit`.
+This document details the Software Bill of Materials (SBOM), SOUP (Software of Unknown Provenance) risk management, cybersecurity controls, and privacy safeguards for `dicom_flutter_radiology_kit`.
 
 ---
 
@@ -29,7 +29,7 @@ This document details the Software Bill of Materials (SBOM), SOUP (Software of U
 * Memory transfers rely on browser-native `ArrayBuffer` transferrables, preventing cross-isolate memory contamination.
 
 ### 3.2 Data Privacy (PHI Protection)
-* `dicom_web_kit` does not write or cache Protected Health Information (PHI) or DICOM datasets to persistent local storage (e.g. IndexedDB, LocalStorage, or disk) by default.
+* `dicom_flutter_radiology_kit` does not write or cache Protected Health Information (PHI) or DICOM datasets to persistent local storage (e.g. IndexedDB, LocalStorage, or disk) by default.
 * Raw pixel bytes exist solely in volatile memory during active session viewports.
 
 ### 3.3 Network Communication Security

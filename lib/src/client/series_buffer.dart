@@ -1,7 +1,7 @@
 import 'dart:typed_data';
-import 'package:dicom_web_kit/src/codecs/codec_router.dart';
-import 'package:dicom_web_kit/src/codecs/decoder_interface.dart';
-import 'package:dicom_web_kit/src/imaging/pixel_frame.dart';
+import 'package:dicom_flutter_radiology_kit/src/codecs/codec_router.dart';
+import 'package:dicom_flutter_radiology_kit/src/codecs/decoder_interface.dart';
+import 'package:dicom_flutter_radiology_kit/src/imaging/pixel_frame.dart';
 import 'qido_models.dart';
 
 /// In-memory buffer for a single downloaded DICOM frame payload.

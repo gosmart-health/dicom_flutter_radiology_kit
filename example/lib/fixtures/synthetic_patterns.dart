@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'package:dicom_web_kit/dicom_web_kit.dart';
+import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 
 /// Fixture generators for synthetic 16-bit scalar DICOM frames.
 class SyntheticPatterns {

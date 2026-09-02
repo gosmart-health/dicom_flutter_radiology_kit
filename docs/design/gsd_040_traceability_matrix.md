@@ -1,7 +1,7 @@
 # Requirements Traceability Matrix (RTM)
 
 **Document ID:** RTM-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** IEC 62304 Clause 5.1.1 / 5.2.6, FDA Design Controls  
 
 ---

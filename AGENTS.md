@@ -1,8 +1,8 @@
-# AGENTS.md — DicomWebKit Project Guidelines
+# AGENTS.md — DicomFlutterRadiologyKit Project Guidelines
 
 ## Project Architecture & Tech Stack
 - **Target:** Flutter Web & Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit).
-- **Core Package Scope:** Drop-in medical imaging kit (`dicom_web_kit`) focusing on clinical/embedded review, WADO-RS streaming, and zero-jank 16-bit rendering.
+- **Core Package Scope:** Drop-in medical imaging kit (`dicom_flutter_radiology_kit`) focusing on clinical/embedded review, WADO-RS streaming, and zero-jank 16-bit rendering.
 - **Key Constraints:**
   - Do NOT decode large J2K/HTJ2K frames on the main UI isolate. Offload to Web Workers (`web/j2k_worker.js`) running WASM (OpenJPEG/OpenJPH).
   - Do NOT cast 16-bit raw pixel streams directly to 8-bit. Always preserve `Int16List`/`Uint16List` scalar values and apply Modality/VOI LUTs dynamically.

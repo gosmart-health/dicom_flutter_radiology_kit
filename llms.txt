@@ -1,9 +1,9 @@
-# dicom_web_kit
+# dicom_flutter_radiology_kit
 
 > Drop-in clinical medical imaging kit for Flutter Web & Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit).
 
 ## Overview
-`dicom_web_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library designed for Flutter applications on browser and desktop platforms. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls.
+`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library designed for Flutter applications on browser and desktop platforms. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls.
 
 ## Key Architectural Principles
 1. **Off-Thread Decoding**: Never decode large JPEG 2000 / HTJ2K DICOM frames on the main UI thread. All heavy decoding is dispatched to Web Workers (`web/j2k_worker.js`) running WASM OpenJPEG/OpenJPH builds via `package:web`.
@@ -12,7 +12,7 @@
 4. **Minimal Tag Footprint**: Avoids heavy DICOM standard Part 6 dictionary bundles by utilizing focused rendering constants.
 
 ## Directory Structure
-- `lib/dicom_web_kit.dart`: Public barrel export.
+- `lib/dicom_flutter_radiology_kit.dart`: Public barrel export.
 - `lib/src/client/`: WADO-RS / QIDO-RS REST client (`dicom_web_client.dart`) and multipart stream reader (`multipart_stream.dart`).
 - `lib/src/codecs/`: Decoders, Web Worker WASM bridge (`wasm_worker_bridge.dart`), and codec router (`codec_router.dart`).
 - `lib/src/imaging/`: 16-bit `PixelFrame`, dynamic `VoiLut` pipeline, and `WindowPresets`.

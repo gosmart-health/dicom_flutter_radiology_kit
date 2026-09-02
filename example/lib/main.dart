@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:dicom_web_kit/dicom_web_kit.dart';
+import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 import 'fixtures/synthetic_patterns.dart';
 
 void main() {
@@ -13,7 +13,7 @@ class DicomViewerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'DICOM Web Kit Test Viewer',
+      title: 'DICOM Flutter Radiology Kit Test Viewer',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F1218),
@@ -185,7 +185,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           children: [
             Icon(Icons.medical_services_outlined, color: Color(0xFF388BFD), size: 20),
             SizedBox(width: 10),
-            Text('DICOM Web Kit'),
+            Text('DICOM Flutter Radiology Kit'),
             SizedBox(width: 8),
             Chip(
               label: Text('16-bit VOI LUT', style: TextStyle(fontSize: 10, color: Colors.white)),

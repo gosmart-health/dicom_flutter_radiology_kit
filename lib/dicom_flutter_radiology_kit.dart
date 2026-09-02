@@ -1,5 +1,5 @@
 /// Drop-in medical imaging kit for Flutter Web & Desktop.
-library dicom_web_kit;
+library dicom_flutter_radiology_kit;
 
 // Client & Buffers
 export 'src/client/dicom_web_client.dart';

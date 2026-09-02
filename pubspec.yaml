@@ -1,9 +1,9 @@
-name: dicom_web_kit
+name: dicom_flutter_radiology_kit
 description: >-
   Drop-in medical imaging kit for Flutter Web & Desktop featuring WADO-RS streaming,
   Web Worker WASM decoding, dynamic 16-bit scalar VOI LUT rendering, and clinical viewports.
 version: 0.1.0
-homepage: https://github.com/gosmart-health/dicom_web_kit
+homepage: https://github.com/gosmart-health/dicom_flutter_radiology_kit
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

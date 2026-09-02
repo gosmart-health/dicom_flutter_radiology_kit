@@ -1,13 +1,13 @@
 # System Design Specification (SDS) / Software Architecture Description
 
 **Document ID:** SDS-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** IEC 62304 Clause 5.3 / 5.4, FDA 21 CFR 820.30  
 
 ---
 
 ## 1. Executive Summary & Architectural Scope
-`dicom_web_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering kit built for Flutter Web and Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit). This document defines the subsystem decomposition, memory lifecycle, thread isolation boundaries, and data pipelines required for medical image display.
+`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering kit built for Flutter Web and Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit). This document defines the subsystem decomposition, memory lifecycle, thread isolation boundaries, and data pipelines required for medical image display.
 
 ---
 

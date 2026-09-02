@@ -1,13 +1,13 @@
 # Software Verification & Validation (V&V) Plan
 
 **Document ID:** VVP-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** IEC 62304 Clause 5.5 / 5.6 / 5.7, FDA 21 CFR 820.30  
 
 ---
 
 ## 1. Introduction & Strategy
-This document outlines the Verification & Validation strategy for `dicom_web_kit`. The goal is to verify that all functional, performance, safety, and regulatory display requirements defined in the SRS are satisfied without defect.
+This document outlines the Verification & Validation strategy for `dicom_flutter_radiology_kit`. The goal is to verify that all functional, performance, safety, and regulatory display requirements defined in the SRS are satisfied without defect.
 
 ---
 

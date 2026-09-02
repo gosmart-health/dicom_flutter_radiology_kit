@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:dicom_web_kit/dicom_web_kit.dart';
+import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 
 void main() {
   test('VoiLut and ui.decodeImageFromPixels render 16-bit frames without RangeError', () async {

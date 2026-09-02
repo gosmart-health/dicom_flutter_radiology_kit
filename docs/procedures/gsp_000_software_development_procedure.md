@@ -1,7 +1,7 @@
 # Software Development Procedure (SOP)
 
 **Document ID:** GSP-000  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** IEC 62304:2006+A1:2015 (Clauses 5.1–5.8), ISO 13485:2016 Clause 7.3, FDA 21 CFR 820.30  
 **Software Safety Class:** Class B (Non-life-threatening clinical review / diagnostic display aid)  
 
@@ -10,7 +10,7 @@
 ## 1. Purpose & Scope
 
 ### 1.1 Purpose
-This Standard Operating Procedure (SOP) defines the Software Development Life Cycle (SDLC) processes, responsibilities, and quality controls for `dicom_web_kit`. It ensures that all software artifacts meet medical device software quality, cybersecurity, traceability, and regulatory compliance standards prior to release.
+This Standard Operating Procedure (SOP) defines the Software Development Life Cycle (SDLC) processes, responsibilities, and quality controls for `dicom_flutter_radiology_kit`. It ensures that all software artifacts meet medical device software quality, cybersecurity, traceability, and regulatory compliance standards prior to release.
 
 ### 1.2 Scope
 This procedure applies to:
@@ -23,7 +23,7 @@ This procedure applies to:
 
 ## 2. Software Safety Classification (IEC 62304 Cl. 4.3)
 
-In accordance with **IEC 62304 Clause 4.3**, `dicom_web_kit` is categorized as **Software Safety Class B**:
+In accordance with **IEC 62304 Clause 4.3**, `dicom_flutter_radiology_kit` is categorized as **Software Safety Class B**:
 - **Definition:** No injury or non-serious injury is possible from direct software failure; however, software outputs may inform medical diagnoses when integrated into a downstream medical device system.
 - **Required Lifecycle Deliverables for Class B:**
   1. Software Development Plan & Procedures (this document).

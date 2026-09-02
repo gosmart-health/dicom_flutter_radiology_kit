@@ -1,6 +1,6 @@
 # Design Controls & Regulatory Documentation
 
-This directory contains the FDA 510(k) and IEC 62304 / ISO 14971 aligned Design Controls documentation suite for `dicom_web_kit`.
+This directory contains the FDA 510(k) and IEC 62304 / ISO 14971 aligned Design Controls documentation suite for `dicom_flutter_radiology_kit`.
 
 The documents are prefixed with `gsd_XXX` in recommended reading order (from requirements to design, risk, V&V, traceability, and cybersecurity).
 

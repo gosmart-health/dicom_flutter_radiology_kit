@@ -1,13 +1,13 @@
 # Software Requirements Specification (SRS)
 
 **Document ID:** SRS-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** IEC 62304 Clause 5.2, FDA 21 CFR 820.30  
 
 ---
 
 ## 1. Scope & Purpose
-This document specifies the functional, performance, display, and interface requirements for the `dicom_web_kit` library. Downstream medical device integrators can use this document as a baseline for software verification.
+This document specifies the functional, performance, display, and interface requirements for the `dicom_flutter_radiology_kit` library. Downstream medical device integrators can use this document as a baseline for software verification.
 
 ---
 

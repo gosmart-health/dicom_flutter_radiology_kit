@@ -1,4 +1,4 @@
-# dicom_web_kit — Full API Specification & Reference Manual
+# dicom_flutter_radiology_kit — Full API Specification & Reference Manual
 
 ## Module 1: Client (`lib/src/client/`)
 

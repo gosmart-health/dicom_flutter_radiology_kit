@@ -1,11 +1,11 @@
-# dicom_web_kit
+# dicom_flutter_radiology_kit
 
 Drop-in clinical medical imaging kit for Flutter Web & Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit).
 
 ---
 
 ## Overview
-`dicom_web_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library built for Flutter applications on web and desktop platforms. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off the main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls and HUD overlays.
+`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library built for Flutter applications on web and desktop platforms. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off the main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls and HUD overlays.
 
 ---
 
@@ -19,18 +19,18 @@ Drop-in clinical medical imaging kit for Flutter Web & Desktop (Dart 3+ WasmGC, 
 
 ## Quick Start
 
-Add `dicom_web_kit` to your `pubspec.yaml`:
+Add `dicom_flutter_radiology_kit` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dicom_web_kit: ^0.1.0
+  dicom_flutter_radiology_kit: ^0.1.0
 ```
 
 ### Basic Viewport Usage
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:dicom_web_kit/dicom_web_kit.dart';
+import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 
 class MedicalViewerPage extends StatefulWidget {
   const MedicalViewerPage({super.key});
@@ -71,7 +71,7 @@ class _MedicalViewerPageState extends State<MedicalViewerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('DICOM Web Kit Viewer')),
+      appBar: AppBar(title: const Text('DICOM Flutter Radiology Kit Viewer')),
       body: DicomViewport(
         controller: _controller,
         showOverlay: true,
@@ -85,7 +85,7 @@ class _MedicalViewerPageState extends State<MedicalViewerPage> {
 
 ## Document Walkthrough (Regulatory & Quality System)
 
-To minimize regulatory friction for downstream medical device integrators seeking FDA 510(k) clearance or CE Mark (IEC 62304 / ISO 14971 / ISO 13485 compliance), `dicom_web_kit` provides formal documentation suites categorized by prefix:
+To minimize regulatory friction for downstream medical device integrators seeking FDA 510(k) clearance or CE Mark (IEC 62304 / ISO 14971 / ISO 13485 compliance), `dicom_flutter_radiology_kit` provides formal documentation suites categorized by prefix:
 - **`gsd_XXX` (`d` for Design Controls)** under [`docs/design/`](./docs/design/)
 - **`gsp_XXX` (`p` for Procedures / SOPs)** under [`docs/procedures/`](./docs/procedures/)
 
@@ -109,7 +109,7 @@ To minimize regulatory friction for downstream medical device integrators seekin
 ---
 
 ## Directory Structure
-- `lib/dicom_web_kit.dart`: Main public barrel export.
+- `lib/dicom_flutter_radiology_kit.dart`: Main public barrel export.
 - `lib/src/client/`: WADO-RS / QIDO-RS REST client (`dicom_web_client.dart`) and multipart stream reader (`multipart_stream.dart`).
 - `lib/src/codecs/`: Decoders, Web Worker WASM bridge (`wasm_worker_bridge.dart`), and codec router (`codec_router.dart`).
 - `lib/src/imaging/`: 16-bit `PixelFrame`, dynamic `VoiLut` pipeline, and `WindowPresets`.

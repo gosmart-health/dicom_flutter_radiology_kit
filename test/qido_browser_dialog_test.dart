@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:dicom_web_kit/dicom_web_kit.dart';
+import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 
 void main() {
   testWidgets('QidoBrowserDialog renders headers, study data, and allows selecting study', (WidgetTester tester) async {

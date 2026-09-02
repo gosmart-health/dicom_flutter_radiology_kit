@@ -1,5 +1,5 @@
-name: dicom_web_kit_example
-description: "Interactive clinical test viewer and workbench for dicom_web_kit."
+name: dicom_flutter_radiology_kit_example
+description: "Interactive clinical test viewer and workbench for dicom_flutter_radiology_kit."
 publish_to: 'none'
 version: 0.1.0
 
@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dicom_web_kit:
+  dicom_flutter_radiology_kit:
     path: ../
 
 dev_dependencies:

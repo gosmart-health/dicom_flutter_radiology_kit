@@ -1,13 +1,13 @@
 # Hazard Analysis & Software Risk Management Plan
 
 **Document ID:** RMF-DWK-001  
-**Project:** `dicom_web_kit`  
+**Project:** `dicom_flutter_radiology_kit`  
 **Regulatory Standard Alignment:** ISO 14971:2019, IEC 62304 Clause 7, FDA SaMD Safety Guidance  
 
 ---
 
 ## 1. Risk Management Framework
-This document provides a Software Hazard Analysis for `dicom_web_kit`. It identifies potential software hazards associated with DICOM image decoding, memory manipulation, and viewport rendering, along with software risk control measures implemented in the architecture.
+This document provides a Software Hazard Analysis for `dicom_flutter_radiology_kit`. It identifies potential software hazards associated with DICOM image decoding, memory manipulation, and viewport rendering, along with software risk control measures implemented in the architecture.
 
 ---
 
@@ -25,4 +25,4 @@ This document provides a Software Hazard Analysis for `dicom_web_kit`. It identi
 ---
 
 ## 3. Risk Management Conclusion
-All identified hazards have been mitigated through software design controls. The residual risk for `dicom_web_kit` components is assessed as **acceptable** for medical image visualization.
+All identified hazards have been mitigated through software design controls. The residual risk for `dicom_flutter_radiology_kit` components is assessed as **acceptable** for medical image visualization.
