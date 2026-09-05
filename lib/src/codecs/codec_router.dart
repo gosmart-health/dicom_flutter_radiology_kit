@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'decoder_interface.dart';
 import 'wasm_worker_bridge.dart';
 
@@ -27,7 +28,7 @@ enum DicomCompressionMode {
   jpeg2000Lossless(
     label: 'JPEG2000_LOSSLESS',
     transferSyntaxUID: DicomTransferSyntaxes.jpeg2000Lossless,
-    mediaType: 'image/jpx',
+    mediaType: 'image/jp2',
   ),
   jpeg2000(
     label: 'JPEG2000',
@@ -57,7 +58,7 @@ enum DicomCompressionMode {
 
   /// WADO-RS Accept header value for this compression mode.
   String get acceptHeader =>
-      'multipart/related; type="$mediaType"; transfer-syntax="$transferSyntaxUID", $mediaType, application/octet-stream';
+      'multipart/related; type="$mediaType"; transfer-syntax="$transferSyntaxUID"';
 }
 
 /// Dispatcher routing frames to decoders based on bitstream signature and DICOM Transfer Syntax UID.
@@ -82,7 +83,7 @@ class CodecRouter {
     // 2. Dispatch based on Transfer Syntax UID
     switch (transferSyntaxUID) {
       case DicomTransferSyntaxes.rleLossless:
-        return _decodeRle(frameBytes, options);
+        return await _decodeRle(frameBytes, options);
 
       case DicomTransferSyntaxes.jpegBaseline1:
       case DicomTransferSyntaxes.jpegExtended2_4:
@@ -122,7 +123,9 @@ class CodecRouter {
           list[i] = byteData.getUint8(i * 4);
         }
 
-        image.dispose();
+        if (!kIsWeb) {
+          image.dispose();
+        }
 
         return DecodeResult(
           pixelData: list,
@@ -133,7 +136,9 @@ class CodecRouter {
           isSigned: false,
         );
       }
-      image.dispose();
+      if (!kIsWeb) {
+        image.dispose();
+      }
     } catch (_) {}
 
     return await _wasmWorkerBridge.decodeJpeg(bytes, options);
@@ -192,92 +197,13 @@ class CodecRouter {
     );
   }
 
-  /// DICOM Part 5 Annex G RLE Decompressor.
-  static DecodeResult _decodeRle(Uint8List bytes, DecodeOptions options) {
-    final numPixels = options.width * options.height;
-    if (bytes.length < 64) {
-      return _decodeUncompressed(bytes, options);
-    }
+  /// DICOM Part 5 Annex G RLE Decompressor offloaded to Web Worker / background isolate.
+  static Future<DecodeResult> _decodeRle(Uint8List bytes, DecodeOptions options) async {
+    try {
+      return await _wasmWorkerBridge.decodeRle(bytes, options);
+    } catch (_) {}
 
-    final byteData = ByteData.sublistView(bytes);
-    final numSegments = byteData.getUint32(0, Endian.little);
-    if (numSegments < 1 || numSegments > 15) {
-      return _decodeUncompressed(bytes, options);
-    }
-
-    final segmentOffsets = <int>[];
-    for (int s = 0; s < numSegments; s++) {
-      segmentOffsets.add(byteData.getUint32((s + 1) * 4, Endian.little));
-    }
-
-    final decompressedSegments = <Uint8List>[];
-    for (int s = 0; s < numSegments; s++) {
-      final start = segmentOffsets[s];
-      final end = (s + 1 < numSegments) ? segmentOffsets[s + 1] : bytes.length;
-      if (start >= bytes.length) break;
-
-      final segData = _unpackPackBits(bytes.sublist(start, end.clamp(start, bytes.length)), numPixels);
-      decompressedSegments.add(segData);
-    }
-
-    final TypedData pixels;
-    if (options.bitsAllocated == 16 && decompressedSegments.length >= 2) {
-      final msb = decompressedSegments[0];
-      final lsb = decompressedSegments[1];
-      if (options.isSigned) {
-        final list = Int16List(numPixels);
-        for (int i = 0; i < numPixels; i++) {
-          final m = i < msb.length ? msb[i] : 0;
-          final l = i < lsb.length ? lsb[i] : 0;
-          final val = (m << 8) | l;
-          list[i] = val > 32767 ? val - 65536 : val;
-        }
-        pixels = list;
-      } else {
-        final list = Uint16List(numPixels);
-        for (int i = 0; i < numPixels; i++) {
-          final m = i < msb.length ? msb[i] : 0;
-          final l = i < lsb.length ? lsb[i] : 0;
-          list[i] = (m << 8) | l;
-        }
-        pixels = list;
-      }
-    } else if (decompressedSegments.isNotEmpty) {
-      pixels = decompressedSegments[0];
-    } else {
-      return _decodeUncompressed(bytes, options);
-    }
-
-    return DecodeResult(
-      pixelData: pixels,
-      width: options.width,
-      height: options.height,
-      bitsAllocated: options.bitsAllocated,
-      bitsStored: options.bitsStored,
-      isSigned: options.isSigned,
-    );
-  }
-
-  static Uint8List _unpackPackBits(Uint8List input, int expectedSize) {
-    final output = BytesBuilder(copy: false);
-    int i = 0;
-    while (i < input.length && output.length < expectedSize) {
-      final n = input[i++];
-      if (n >= 0 && n <= 127) {
-        final count = n + 1;
-        if (i + count <= input.length) {
-          output.add(input.sublist(i, i + count));
-          i += count;
-        }
-      } else if (n >= 129 && n <= 255) {
-        final count = 257 - n;
-        if (i < input.length) {
-          final val = input[i++];
-          output.add(Uint8List(count)..fillRange(0, count, val));
-        }
-      }
-    }
-    return output.toBytes();
+    return _decodeUncompressed(bytes, options);
   }
 
   static void dispose() {

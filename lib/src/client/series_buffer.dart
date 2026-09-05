@@ -1,8 +1,28 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:dicom_flutter_radiology_kit/src/codecs/codec_router.dart';
 import 'package:dicom_flutter_radiology_kit/src/codecs/decoder_interface.dart';
 import 'package:dicom_flutter_radiology_kit/src/imaging/pixel_frame.dart';
 import 'qido_models.dart';
+
+/// Represents a progressive frame event emitted as a series streams over the network.
+class DicomProgressiveFrame {
+  final int index;
+  final int totalCount;
+  final DicomFrameBuffer frameBuffer;
+  final PixelFrame? predecodedPixelFrame;
+
+  const DicomProgressiveFrame({
+    required this.index,
+    required this.totalCount,
+    required this.frameBuffer,
+    this.predecodedPixelFrame,
+  });
+
+  /// Returns the decoded [PixelFrame], utilizing predecoded instance if present.
+  Future<PixelFrame> toPixelFrame() async =>
+      predecodedPixelFrame ?? await frameBuffer.toPixelFrame();
+}
 
 /// In-memory buffer for a single downloaded DICOM frame payload.
 class DicomFrameBuffer {
@@ -52,24 +72,57 @@ class DicomFrameBuffer {
   }
 }
 
-/// In-memory storage container for a downloaded DICOM series and its frames.
+/// In-memory storage container for a downloaded DICOM series and its frames with
+/// dynamic progressive buffering and frame caching.
 class DicomSeriesBuffer {
   final DicomStudy? study;
   final DicomSeries series;
   final List<DicomFrameBuffer> frames;
-  final int totalExpectedInstances;
-  final bool isComplete;
+  int totalExpectedInstances;
+  bool _isCompleteExplicit;
+  final int maxCacheSize;
+
+  final Map<int, PixelFrame> _decodedCache = {};
+  final List<int> _lruKeys = [];
+  final StreamController<DicomFrameBuffer> _frameAddedController =
+      StreamController<DicomFrameBuffer>.broadcast();
 
   DicomSeriesBuffer({
     this.study,
     required this.series,
     required this.frames,
     required this.totalExpectedInstances,
-    required this.isComplete,
-  });
+    bool isComplete = false,
+    this.maxCacheSize = 50,
+  }) : _isCompleteExplicit = isComplete;
+
+  /// Stream of frames added dynamically during progressive network retrieval.
+  Stream<DicomFrameBuffer> get onFrameAdded => _frameAddedController.stream;
 
   /// Total number of frames currently in buffer.
   int get frameCount => frames.length;
+
+  /// Whether all expected instances in this series have been received.
+  bool get isComplete =>
+      _isCompleteExplicit || (totalExpectedInstances > 0 && frames.length >= totalExpectedInstances);
+
+  set isComplete(bool value) {
+    _isCompleteExplicit = value;
+  }
+
+  bool _isDisposed = false;
+
+  /// Whether this buffer has been disposed.
+  bool get isDisposed => _isDisposed;
+
+  /// Appends a newly retrieved frame buffer to memory.
+  void addFrame(DicomFrameBuffer frame) {
+    if (_isDisposed) return;
+    frames.add(frame);
+    if (!_frameAddedController.isClosed) {
+      _frameAddedController.add(frame);
+    }
+  }
 
   /// Retrieves frame buffer at index.
   DicomFrameBuffer? getFrame(int index) {
@@ -77,16 +130,45 @@ class DicomSeriesBuffer {
     return frames[index];
   }
 
-  /// Decodes and returns the [PixelFrame] at index.
+  /// Pre-populates decoded [PixelFrame] cache for instantaneous cine scrubbing with LRU eviction.
+  void cachePixelFrame(int index, PixelFrame frame) {
+    if (_isDisposed) return;
+    if (_decodedCache.containsKey(index)) {
+      _lruKeys.remove(index);
+    } else if (_lruKeys.length >= maxCacheSize) {
+      final oldest = _lruKeys.removeAt(0);
+      _decodedCache.remove(oldest);
+    }
+    _lruKeys.add(index);
+    _decodedCache[index] = frame;
+  }
+
+  /// Decodes and returns the [PixelFrame] at index with in-memory caching.
   Future<PixelFrame?> getPixelFrame(int index) async {
+    if (_isDisposed) return null;
+    if (_decodedCache.containsKey(index)) {
+      _lruKeys.remove(index);
+      _lruKeys.add(index);
+      return _decodedCache[index];
+    }
     final frame = getFrame(index);
     if (frame == null) return null;
-    return await frame.toPixelFrame();
+    final decoded = await frame.toPixelFrame();
+    cachePixelFrame(index, decoded);
+    return decoded;
   }
 
-  /// Clears in-memory frame buffers.
+  /// Clears in-memory frame buffers and cached decoded pixels.
   void clear() {
     frames.clear();
+    _decodedCache.clear();
+    _lruKeys.clear();
+  }
+
+  /// Disposes internal broadcast stream controller.
+  void dispose() {
+    _isDisposed = true;
+    _frameAddedController.close();
+    clear();
   }
 }
-

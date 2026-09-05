@@ -5,29 +5,40 @@ import '../client/qido_models.dart';
 import '../client/series_buffer.dart';
 import '../codecs/codec_router.dart';
 import '../imaging/pixel_frame.dart';
+import '../persistence/server_url_store.dart';
 
 /// Interactive QIDO-RS Study & Series Browser dialog with WADO series buffering and compression selection.
 class QidoBrowserDialog extends StatefulWidget {
-  final String initialServerUrl;
+  final String? initialServerUrl;
   final http.Client? httpClient;
   final DicomCompressionMode defaultCompressionMode;
   final void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)? onSeriesLoaded;
+  final void Function(DicomStudy study)? onStudySelected;
 
   const QidoBrowserDialog({
     super.key,
-    this.initialServerUrl = 'http://localhost:8000',
+    this.initialServerUrl,
     this.httpClient,
     this.defaultCompressionMode = DicomCompressionMode.raw,
     this.onSeriesLoaded,
+    this.onStudySelected,
   });
+
+  /// Session-persisted compression mode across dialog invocations.
+  static DicomCompressionMode? _lastSelectedCompressionMode;
+
+  /// Active session compression mode.
+  static DicomCompressionMode? get activeCompressionMode => _lastSelectedCompressionMode;
+  static set activeCompressionMode(DicomCompressionMode? mode) => _lastSelectedCompressionMode = mode;
 
   /// Static helper to launch the browser dialog.
   static Future<DicomSeriesBuffer?> show(
     BuildContext context, {
-    String initialServerUrl = 'http://localhost:8000',
+    String? initialServerUrl,
     http.Client? httpClient,
     DicomCompressionMode defaultCompressionMode = DicomCompressionMode.raw,
     void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)? onSeriesLoaded,
+    void Function(DicomStudy study)? onStudySelected,
   }) {
     return showDialog<DicomSeriesBuffer>(
       context: context,
@@ -37,6 +48,7 @@ class QidoBrowserDialog extends StatefulWidget {
         httpClient: httpClient,
         defaultCompressionMode: defaultCompressionMode,
         onSeriesLoaded: onSeriesLoaded,
+        onStudySelected: onStudySelected,
       ),
     );
   }
@@ -49,13 +61,14 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   late final TextEditingController _urlController;
   late final TextEditingController _filterController;
   late DicomCompressionMode _selectedCompressionMode;
+  late List<String> _serverHistory;
   DicomWebClient? _client;
 
   bool _isLoadingStudies = false;
   bool _isLoadingSeries = false;
   bool _isDownloading = false;
-  int _downloadedCount = 0;
-  int _totalToDownload = 0;
+  final ValueNotifier<({int loaded, int total})> _downloadProgressNotifier =
+      ValueNotifier((loaded: 0, total: 0));
   String? _errorMessage;
 
   List<DicomStudy> _allStudies = [];
@@ -67,8 +80,10 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedCompressionMode = widget.defaultCompressionMode;
-    _urlController = TextEditingController(text: widget.initialServerUrl);
+    _selectedCompressionMode = QidoBrowserDialog._lastSelectedCompressionMode ?? widget.defaultCompressionMode;
+    final initialUrl = widget.initialServerUrl ?? DicomServerUrlStore.getLastUsedUrl();
+    _urlController = TextEditingController(text: initialUrl);
+    _serverHistory = DicomServerUrlStore.getHistory();
     _filterController = TextEditingController();
     _filterController.addListener(_applyFilter);
     _fetchStudies();
@@ -79,8 +94,18 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
     _filterController.removeListener(_applyFilter);
     _urlController.dispose();
     _filterController.dispose();
+    _downloadProgressNotifier.dispose();
     _client?.dispose();
     super.dispose();
+  }
+
+  void _onSelectServerUrl(String url) {
+    _urlController.text = url;
+    DicomServerUrlStore.recordUrl(url);
+    setState(() {
+      _serverHistory = DicomServerUrlStore.getHistory();
+    });
+    _fetchStudies();
   }
 
   void _initClient() {
@@ -92,6 +117,12 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   }
 
   Future<void> _fetchStudies() async {
+    final currentUrl = _urlController.text.trim();
+    if (currentUrl.isNotEmpty) {
+      DicomServerUrlStore.recordUrl(currentUrl);
+      _serverHistory = DicomServerUrlStore.getHistory();
+    }
+
     setState(() {
       _isLoadingStudies = true;
       _errorMessage = null;
@@ -140,6 +171,7 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   }
 
   Future<void> _selectStudy(DicomStudy study) async {
+    widget.onStudySelected?.call(study);
     setState(() {
       _selectedStudy = study;
       _isLoadingSeries = true;
@@ -168,10 +200,9 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
     setState(() {
       _selectedSeries = series;
       _isDownloading = true;
-      _downloadedCount = 0;
-      _totalToDownload = series.numberOfInstances;
       _errorMessage = null;
     });
+    _downloadProgressNotifier.value = (loaded: 0, total: series.numberOfInstances);
 
     try {
       final seriesBuffer = await _client!.downloadSeriesBuffers(
@@ -179,16 +210,9 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
         series: series,
         compressionMode: _selectedCompressionMode,
         onProgress: (loaded, total) {
-          if (mounted) {
-            setState(() {
-              _downloadedCount = loaded;
-              _totalToDownload = total;
-            });
-          }
+          _downloadProgressNotifier.value = (loaded: loaded, total: total);
         },
       );
-
-      if (!mounted) return;
 
       // Decode initial frame for viewport
       PixelFrame? initialFrame;
@@ -196,13 +220,13 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
         initialFrame = await seriesBuffer.getPixelFrame(0);
       }
 
-      if (!mounted) return;
+      if (mounted) {
+        Navigator.of(context).pop(seriesBuffer);
+      }
 
       if (widget.onSeriesLoaded != null && initialFrame != null) {
         widget.onSeriesLoaded!(seriesBuffer, initialFrame);
       }
-
-      Navigator.of(context).pop(seriesBuffer);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -300,15 +324,56 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
             flex: 3,
             child: TextField(
               controller: _urlController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'DICOMweb Server Root',
                 hintText: 'http://localhost:8000',
                 isDense: true,
                 filled: true,
-                fillColor: Color(0xFF161B22),
-                prefixIcon: Icon(Icons.dns_outlined, size: 18, color: Color(0xFF58A6FF)),
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                fillColor: const Color(0xFF161B22),
+                prefixIcon: const Icon(Icons.dns_outlined, size: 18, color: Color(0xFF58A6FF)),
+                suffixIcon: PopupMenuButton<String>(
+                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF58A6FF)),
+                  tooltip: 'Recent DICOMweb Roots',
+                  color: const Color(0xFF1C2128),
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: const BorderSide(color: Color(0xFF30363D)),
+                  ),
+                  onSelected: _onSelectServerUrl,
+                  itemBuilder: (context) {
+                    return _serverHistory.map((url) {
+                      final isCurrent = url.toLowerCase() == _urlController.text.trim().toLowerCase();
+                      return PopupMenuItem<String>(
+                        value: url,
+                        height: 36,
+                        child: Row(
+                          children: [
+                            Icon(
+                              isCurrent ? Icons.check : Icons.history,
+                              size: 16,
+                              color: isCurrent ? const Color(0xFF58A6FF) : const Color(0xFF8B949E),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                url,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isCurrent ? const Color(0xFF58A6FF) : Colors.white,
+                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
               onSubmitted: (_) => _fetchStudies(),
             ),
@@ -365,6 +430,7 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                     onChanged: (mode) {
                       if (mode != null) {
                         setState(() => _selectedCompressionMode = mode);
+                        QidoBrowserDialog._lastSelectedCompressionMode = mode;
                       }
                     },
                   ),
@@ -483,7 +549,7 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
               return Material(
                 color: isSelected ? const Color(0xFF1F6FEB).withValues(alpha: 0.2) : Colors.transparent,
                 child: InkWell(
-                  onTap: () => _selectStudy(study),
+                  onTap: _isDownloading ? null : () => _selectStudy(study),
                   hoverColor: const Color(0xFF30363D).withValues(alpha: 0.4),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -680,7 +746,7 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                         : const Icon(Icons.download_for_offline_outlined, size: 16),
                                     label: Text(
                                       isDownloadingThis
-                                          ? 'Buffering $_downloadedCount/$_totalToDownload...'
+                                          ? 'Buffering...'
                                           : 'Download & View Series',
                                       style: const TextStyle(fontSize: 12),
                                     ),
@@ -703,37 +769,44 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   }
 
   Widget _buildDownloadProgressFooter() {
-    final progress = _totalToDownload > 0 ? (_downloadedCount / _totalToDownload) : 0.0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFF161B22),
-        border: Border(top: BorderSide(color: Color(0xFF30363D))),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ValueListenableBuilder<({int loaded, int total})>(
+      valueListenable: _downloadProgressNotifier,
+      builder: (context, progressData, _) {
+        final loaded = progressData.loaded;
+        final total = progressData.total;
+        final progress = total > 0 ? (loaded / total) : 0.0;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFF161B22),
+            border: Border(top: BorderSide(color: Color(0xFF30363D))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Buffering [${_selectedCompressionMode.label}] into 16-bit memory: $_downloadedCount / $_totalToDownload frames',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF58A6FF)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Buffering [${_selectedCompressionMode.label}] into 16-bit memory: $loaded / $total frames',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF58A6FF)),
+                  ),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
               ),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(
+                value: progress > 0 ? progress : null,
+                backgroundColor: const Color(0xFF21262D),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF388BFD)),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          LinearProgressIndicator(
-            value: progress > 0 ? progress : null,
-            backgroundColor: const Color(0xFF21262D),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF388BFD)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

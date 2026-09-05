@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'viewport_controller.dart';
 
-/// Clinical DICOM HUD overlays displaying patient demographics, tags, orientation markers, scale.
+/// Clinical DICOM HUD overlays displaying patient demographics, tags, orientation markers, scale,
+/// and image index (e.g. Img: 2/128).
 class ViewportOverlays extends StatelessWidget {
   final ViewportController controller;
 
@@ -40,7 +41,7 @@ class ViewportOverlays extends StatelessWidget {
                 ], crossAxisAlignment: CrossAxisAlignment.end),
               ),
 
-              // Bottom Left Overlay: Window Level Status
+              // Bottom Left Overlay: Window Level Status & Zoom
               Positioned(
                 bottom: 12,
                 left: 12,
@@ -50,6 +51,18 @@ class ViewportOverlays extends StatelessWidget {
                   'Zoom: ${(controller.zoom * 100).toInt()}%',
                 ]),
               ),
+
+              // Bottom Right Overlay: Frame / Slice Number (e.g. Img: 2/128 or 2/128)
+              if (controller.frameIndex != null)
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: _buildOverlayText([
+                    controller.totalFrames != null
+                        ? 'Img: ${controller.frameIndex} / ${controller.totalFrames}'
+                        : 'Img: ${controller.frameIndex}',
+                  ], crossAxisAlignment: CrossAxisAlignment.end),
+                ),
 
               // Anatomical Orientation Markers (A / P / L / R)
               Positioned(

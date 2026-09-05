@@ -4,6 +4,11 @@
     "**/.fvm": true
   },
   "files.watcherExclude": {
-    "**/.fvm": true
-  }
+    "**/.fvm": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.git/index*": true
+  },
+  "gitlens.enabled": false,
+  "gitlens.mode.active": "zen"
 }

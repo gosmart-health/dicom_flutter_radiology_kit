@@ -24,7 +24,9 @@ This document specifies the functional, performance, display, and interface requ
 | **REQ-FUN-007** | Dynamic VOI LUT | The system SHALL compute Window Center and Window Width transformations dynamically during display rendering. | High |
 | **REQ-FUN-008** | Clinical Window Presets | The system SHALL provide pre-configured clinical window presets (Soft Tissue, Bone, Lung, Brain, Abdomen, Angio). | Medium |
 | **REQ-FUN-009** | Anatomical HUD Overlays | The system SHALL display HUD overlays for patient demographic metadata, DICOM tags, orientation markers (A/P/L/R), and scale. | High |
-| **REQ-FUN-010** | Interactive Pan & Zoom | The system SHALL support pan and zoom gesture operations with viewport transformation updates. | High |
+| **REQ-FUN-010** | Desktop Multimodal Gestures | The system SHALL support desktop PACS mouse & modifier navigation conforming to general industrial PACS conventions: Left Click Drag for Window/Level ($\Delta x$ width, $\Delta y$ center/brightness), Right Click Drag or Shift+Left Drag for dynamic continuous Zoom (drag up = zoom in), Middle Click Drag or Ctrl/Cmd+Left Drag for Canvas Pan, Mouse Wheel for Series Stack Scrolling, and Double Click for View Reset. | High |
+| **REQ-FUN-011** | Mobile Multi-Touch Gestures | The system SHALL support mobile/tablet touch gestures conforming to Apple iOS Human Interface Guidelines: 1-Finger Drag for Window/Level, 2-Finger Pinch/Spread for continuous Zoom around the touch centroid, 2-Finger Parallel Drag for Canvas Pan, and Double Tap for View Reset. | High |
+| **REQ-FUN-012** | Gesture Collision Avoidance | The system SHALL avoid three-finger touch gestures on mobile to prevent collision with iOS system-level gestures (Copy, Paste, Undo) and OEM screenshot shortcuts. | Medium |
 
 ---
 
@@ -44,3 +46,7 @@ This document specifies the functional, performance, display, and interface requ
 | :--- | :--- | :--- |
 | **REQ-REG-001** | NEMA PS3.14 / GSDF | Image rendering SHALL support MONOCHROME1 and MONOCHROME2 Photometric Interpretations cleanly. |
 | **REQ-REG-002** | DICOM Part 18 | WADO-RS / QIDO-RS client SHALL comply with DICOM Part 18 web services specifications. |
+
+| **REQ-FUN-013** | Multi-Viewport Grid Layouts | The system SHALL support [1, 2, 4, 9] on 1 layout formats (1×1, 1×2, 2×2, 3×3) with synchronized frame offset stepping, allowing stack navigation to advance 1 slice across all visible cells concurrently. | High |
+| **REQ-FUN-014** | Per-Frame Presentation State Persistence | The system SHALL maintain and expose presentation state parameters (Window Center, Window Width, Zoom, Pan Offset) per individual frame/instance with hooks for session restoration and live multi-user synchronization. | High |
+| **REQ-FUN-015** | Frame Index HUD Display | The system HUD overlay SHALL render the active frame index and series total in the bottom-right corner (e.g. `Img: 2 / 128`). | High |

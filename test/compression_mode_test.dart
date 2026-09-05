@@ -11,11 +11,17 @@ void main() {
 
       expect(DicomCompressionMode.jpeg2000Lossless.label, 'JPEG2000_LOSSLESS');
       expect(DicomCompressionMode.jpeg2000Lossless.transferSyntaxUID, DicomTransferSyntaxes.jpeg2000Lossless);
+      expect(DicomCompressionMode.jpeg2000Lossless.mediaType, 'image/jp2');
+      expect(DicomCompressionMode.jpeg2000Lossless.acceptHeader, contains('type="image/jp2"'));
       expect(DicomCompressionMode.jpeg2000Lossless.acceptHeader, contains('1.2.840.10008.1.2.4.90'));
+      expect(DicomCompressionMode.jpeg2000Lossless.acceptHeader, isNot(contains('image/jpx')));
 
       expect(DicomCompressionMode.jpeg2000.label, 'JPEG2000');
       expect(DicomCompressionMode.jpeg2000.transferSyntaxUID, DicomTransferSyntaxes.jpeg2000Lossy);
+      expect(DicomCompressionMode.jpeg2000.mediaType, 'image/jp2');
+      expect(DicomCompressionMode.jpeg2000.acceptHeader, contains('type="image/jp2"'));
       expect(DicomCompressionMode.jpeg2000.acceptHeader, contains('1.2.840.10008.1.2.4.91'));
+      expect(DicomCompressionMode.jpeg2000.acceptHeader, isNot(contains('image/jpx')));
 
       expect(DicomCompressionMode.rle.label, 'RLE');
       expect(DicomCompressionMode.rle.transferSyntaxUID, DicomTransferSyntaxes.rleLossless);
@@ -24,6 +30,13 @@ void main() {
       expect(DicomCompressionMode.jpeg.label, 'JPEG');
       expect(DicomCompressionMode.jpeg.transferSyntaxUID, DicomTransferSyntaxes.jpegBaseline1);
       expect(DicomCompressionMode.jpeg.acceptHeader, contains('1.2.840.10008.1.2.4.50'));
+
+      // Ensure no comma separation in any acceptHeader, parameters must be semicolon-delimited
+      for (final mode in DicomCompressionMode.values) {
+        expect(mode.acceptHeader.contains(','), isFalse, reason: '${mode.label} acceptHeader should not contain commas');
+        expect(mode.acceptHeader, contains(';'));
+        expect(mode.acceptHeader, startsWith('multipart/related; type='));
+      }
     });
 
     test('CodecRouter decodes 16-bit RLE PackBits frames', () async {

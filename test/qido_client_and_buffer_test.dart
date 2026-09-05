@@ -112,6 +112,90 @@ void main() {
       expect(list[15], 1750);
       expect(pixelFrame.getModalityValue(list[0]), 0.0); // 1000 - 1000 = 0 HU
     });
+
+    test('fetchFrameBytes requests WADO frames with image/jp2 MIME type for JPEG2000 Lossless', () async {
+      String? capturedAcceptHeader;
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/frames/1')) {
+          capturedAcceptHeader = request.headers['Accept'];
+          return http.Response.bytes(
+            Uint8List.fromList([0xFF, 0x4F, 0xFF, 0x51]), // Dummy J2K codestream header
+            200,
+            headers: {'content-type': 'image/jp2'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final client = DicomWebClient(baseUrl: 'http://localhost:8000', httpClient: mockClient);
+      final bytes = await client.fetchFrameBytes(
+        studyInstanceUID: '1.2.3',
+        seriesInstanceUID: '1.2.3.4',
+        sopInstanceUID: '1.2.3.4.5',
+        frameIndex: 0,
+        compressionMode: DicomCompressionMode.jpeg2000Lossless,
+      );
+
+      expect(bytes, isNotEmpty);
+      expect(capturedAcceptHeader, isNotNull);
+      expect(
+        capturedAcceptHeader,
+        'multipart/related; type="image/jp2"; transfer-syntax="1.2.840.10008.1.2.4.90"',
+      );
+      expect(capturedAcceptHeader!.contains(','), isFalse);
+      expect(capturedAcceptHeader, contains(';'));
+      expect(capturedAcceptHeader, isNot(contains('image/jpx')));
+    });
+
+    test('DicomSeriesBuffer enforces LRU cache eviction within maxCacheSize', () async {
+      final series = DicomSeries.fromJson({
+        '0020000D': {'vr': 'UI', 'Value': ['1.2.3.4.5']},
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.5.1']},
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+        '00200011': {'vr': 'IS', 'Value': [1]},
+        '0008103E': {'vr': 'LO', 'Value': ['LRU Test Series']},
+        '00201209': {'vr': 'IS', 'Value': [5]},
+      });
+
+      final seriesBuffer = DicomSeriesBuffer(
+        series: series,
+        frames: [],
+        totalExpectedInstances: 5,
+        maxCacheSize: 3,
+      );
+
+      final dummyPixelFrame = PixelFrame(
+        rawPixels: Uint16List(16),
+        width: 4,
+        height: 4,
+      );
+
+      // Cache frames 0, 1, 2
+      seriesBuffer.cachePixelFrame(0, dummyPixelFrame);
+      seriesBuffer.cachePixelFrame(1, dummyPixelFrame);
+      seriesBuffer.cachePixelFrame(2, dummyPixelFrame);
+
+      // Now cache frame 3 - frame 0 should be evicted as oldest
+      seriesBuffer.cachePixelFrame(3, dummyPixelFrame);
+
+      // Check directly from getPixelFrame (since frames list is empty, if evicted it returns null)
+      expect(await seriesBuffer.getPixelFrame(0), isNull); // Evicted!
+      expect(await seriesBuffer.getPixelFrame(1), isNotNull);
+      expect(await seriesBuffer.getPixelFrame(2), isNotNull);
+      expect(await seriesBuffer.getPixelFrame(3), isNotNull);
+
+      // Access frame 1 (makes 1 the most recently used)
+      await seriesBuffer.getPixelFrame(1);
+
+      // Now add frame 4 - frame 2 should be evicted (since 1 was accessed after 2)
+      seriesBuffer.cachePixelFrame(4, dummyPixelFrame);
+      expect(await seriesBuffer.getPixelFrame(2), isNull); // Evicted!
+      expect(await seriesBuffer.getPixelFrame(1), isNotNull); // Kept!
+      expect(await seriesBuffer.getPixelFrame(4), isNotNull); // Kept!
+
+      seriesBuffer.dispose();
+      expect(await seriesBuffer.getPixelFrame(1), isNull);
+    });
   });
 }
 

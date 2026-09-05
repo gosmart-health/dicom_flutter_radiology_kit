@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../codecs/codec_router.dart';
+import '../imaging/pixel_frame.dart';
 import 'qido_models.dart';
 import 'series_buffer.dart';
 
@@ -178,7 +181,12 @@ class DicomWebClient {
       ...?headers,
     };
 
-    final response = await _httpClient.get(uri, headers: requestHeaders);
+    final response = await _httpClient
+        .get(uri, headers: requestHeaders)
+        .timeout(const Duration(seconds: 15), onTimeout: () {
+      throw TimeoutException('WADO-RS frame $frameNumber timed out after 15s ($uri)');
+    });
+
     if (response.statusCode != 200) {
       throw Exception(
         'Failed to fetch frame $frameNumber (HTTP ${response.statusCode})',
@@ -189,24 +197,29 @@ class DicomWebClient {
     return _extractFramePayload(response.bodyBytes, contentType);
   }
 
-  /// Downloads all objects and frames of a series into memory buffers [DicomSeriesBuffer].
-  Future<DicomSeriesBuffer> downloadSeriesBuffers({
+  /// Streams frames of a series progressively yielding each [DicomProgressiveFrame]
+  /// as soon as it is retrieved from the network.
+  Stream<DicomProgressiveFrame> streamSeriesFrames({
     DicomStudy? study,
     required DicomSeries series,
     DicomCompressionMode compressionMode = DicomCompressionMode.raw,
-    void Function(int loaded, int total)? onProgress,
-  }) async {
-    // 1. Fetch metadata for all instances in series
+    DicomSeriesBuffer? targetBuffer,
+    bool predecodeFirstFrame = false,
+  }) async* {
     final instances = await fetchInstanceMetadata(
       studyInstanceUID: series.studyInstanceUID,
       seriesInstanceUID: series.seriesInstanceUID,
     );
 
     final total = instances.length;
-    final List<DicomFrameBuffer> frameBuffers = [];
+    final effectiveTransferSyntax = compressionMode.transferSyntaxUID;
+    print('[DICOM-CLIENT] Streaming series ${series.seriesInstanceUID} ($total frames, mode: ${compressionMode.label})');
 
-    // 2. Download frames sequentially/concurrently
     for (int i = 0; i < instances.length; i++) {
+      if (targetBuffer != null && targetBuffer.isDisposed) {
+        print('[DICOM-CLIENT] Streaming aborted: targetBuffer is disposed.');
+        break;
+      }
       final inst = instances[i];
       final rawBytes = await fetchFrameBytes(
         studyInstanceUID: series.studyInstanceUID,
@@ -216,8 +229,6 @@ class DicomWebClient {
         compressionMode: compressionMode,
       );
 
-      // Use negotiated transfer syntax from WADO request
-      final effectiveTransferSyntax = compressionMode.transferSyntaxUID;
       final updatedMetadata = DicomInstanceSummary(
         sopInstanceUID: inst.sopInstanceUID,
         sopClassUID: inst.sopClassUID,
@@ -237,77 +248,124 @@ class DicomWebClient {
         rawJson: inst.rawJson,
       );
 
-      frameBuffers.add(DicomFrameBuffer(
+      final frameBuffer = DicomFrameBuffer(
         frameIndex: i,
         instanceNumber: inst.instanceNumber,
         sopInstanceUID: inst.sopInstanceUID,
         rawBytes: rawBytes,
         metadata: updatedMetadata,
-      ));
+      );
 
+      PixelFrame? predecoded;
+      if (predecodeFirstFrame && i == 0) {
+        try {
+          predecoded = await frameBuffer.toPixelFrame();
+        } catch (_) {}
+      }
+
+      targetBuffer?.addFrame(frameBuffer);
+      if (predecoded != null && targetBuffer != null) {
+        targetBuffer.cachePixelFrame(i, predecoded);
+      }
+
+      yield DicomProgressiveFrame(
+        index: i,
+        totalCount: total,
+        frameBuffer: frameBuffer,
+        predecodedPixelFrame: predecoded,
+      );
+    }
+
+    if (targetBuffer != null) {
+      targetBuffer.isComplete = true;
+    }
+  }
+
+  /// Downloads all objects and frames of a series into memory buffers [DicomSeriesBuffer].
+  Future<DicomSeriesBuffer> downloadSeriesBuffers({
+    DicomStudy? study,
+    required DicomSeries series,
+    DicomCompressionMode compressionMode = DicomCompressionMode.raw,
+    void Function(int loaded, int total)? onProgress,
+  }) async {
+    final buffer = DicomSeriesBuffer(
+      study: study,
+      series: series,
+      frames: [],
+      totalExpectedInstances: series.numberOfInstances,
+    );
+
+    await for (final progressive in streamSeriesFrames(
+      study: study,
+      series: series,
+      compressionMode: compressionMode,
+      targetBuffer: buffer,
+    )) {
       if (onProgress != null) {
-        onProgress(i + 1, total);
+        onProgress(progressive.index + 1, progressive.totalCount);
       }
     }
 
-    return DicomSeriesBuffer(
-      study: study,
-      series: series,
-      frames: frameBuffers,
-      totalExpectedInstances: total,
-      isComplete: frameBuffers.length == total,
-    );
+    return buffer;
   }
 
   /// Extracts pure binary payload from multipart/related or raw bytes response.
   Uint8List _extractFramePayload(Uint8List bytes, String contentType) {
     if (bytes.isEmpty) return bytes;
 
-    if (contentType.contains('multipart/related') || _looksLikeMultipart(bytes)) {
-      String? boundary;
-      final boundaryMatch = RegExp(r'boundary=(?:"([^"]+)"|([^;]+))', caseSensitive: false)
-          .firstMatch(contentType);
-      if (boundaryMatch != null) {
-        boundary = boundaryMatch.group(1) ?? boundaryMatch.group(2)?.trim();
-      }
+    final isMultipart = contentType.toLowerCase().contains('multipart') || _looksLikeMultipart(bytes);
+    if (!isMultipart) {
+      return bytes;
+    }
 
-      if (boundary != null) {
-        final boundaryBytes = '--$boundary'.codeUnits;
-        int idx = _indexOfSublist(bytes, boundaryBytes);
-        if (idx != -1) {
-          final payload = _stripHeaders(bytes.sublist(idx + boundaryBytes.length));
-          int endIdx = _indexOfSublist(payload, boundaryBytes);
-          if (endIdx != -1) {
-            return payload.sublist(0, endIdx);
-          }
-          return payload;
+    String? boundary;
+    final boundaryMatch = RegExp(r'boundary=(?:"([^"]+)"|([^;]+))', caseSensitive: false)
+        .firstMatch(contentType);
+    if (boundaryMatch != null) {
+      boundary = boundaryMatch.group(1) ?? boundaryMatch.group(2)?.trim();
+    }
+
+    if (boundary != null) {
+      final boundaryBytes = '--$boundary'.codeUnits;
+      int idx = _indexOfSublist(bytes, boundaryBytes);
+      if (idx != -1) {
+        final payload = _stripHeaders(bytes.sublist(idx + boundaryBytes.length));
+        int endIdx = _indexOfSublist(payload, boundaryBytes);
+        if (endIdx != -1) {
+          return payload.sublist(0, endIdx);
         }
+        return payload;
       }
+    }
 
-      if (bytes.length >= 2 && bytes[0] == 45 && bytes[1] == 45) { // '--'
-        final stripped = _stripHeaders(bytes);
-        return stripped;
-      }
+    if (_looksLikeMultipart(bytes)) {
+      final stripped = _stripHeaders(bytes);
+      return stripped;
     }
 
     return bytes;
   }
 
   static bool _looksLikeMultipart(Uint8List bytes) {
-    if (bytes.length < 4) return false;
-    return bytes[0] == 45 && bytes[1] == 45; // '--'
+    if (bytes.length < 10) return false;
+    if (bytes[0] != 45 || bytes[1] != 45) return false; // Must start with '--'
+    for (int i = 2; i < math.min(bytes.length, 64); i++) {
+      if (bytes[i] == 10 || bytes[i] == 13) return true;
+      if (bytes[i] < 32 && bytes[i] != 9) return false; // Binary non-text byte found
+    }
+    return false;
   }
 
   static Uint8List _stripHeaders(Uint8List bytes) {
     final doubleCrlf = [13, 10, 13, 10];
     final doubleLf = [10, 10];
     int headerEnd = _indexOfSublist(bytes, doubleCrlf);
-    if (headerEnd != -1) {
+    if (headerEnd != -1 && headerEnd < 1024) {
       var body = bytes.sublist(headerEnd + 4);
       return _trimTrailingBoundary(body);
     }
     headerEnd = _indexOfSublist(bytes, doubleLf);
-    if (headerEnd != -1) {
+    if (headerEnd != -1 && headerEnd < 1024) {
       var body = bytes.sublist(headerEnd + 2);
       return _trimTrailingBoundary(body);
     }
@@ -315,8 +373,10 @@ class DicomWebClient {
   }
 
   static Uint8List _trimTrailingBoundary(Uint8List body) {
+    // Only search within the last 256 bytes to avoid truncating binary compressed payloads
+    final searchStart = math.max(0, body.length - 256);
     int lastBoundary = -1;
-    for (int i = body.length - 2; i >= 0; i--) {
+    for (int i = body.length - 2; i >= searchStart; i--) {
       if (body[i] == 45 && body[i + 1] == 45) { // '--'
         if (i > 0 && (body[i - 1] == 10 || body[i - 1] == 13)) {
           lastBoundary = i - (body[i - 1] == 10 && i > 1 && body[i - 2] == 13 ? 2 : 1);

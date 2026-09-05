@@ -14,11 +14,16 @@ export 'src/codecs/codec_router.dart';
 
 // Imaging
 export 'src/imaging/pixel_frame.dart';
+export 'src/imaging/presentation_state.dart';
 export 'src/imaging/voi_lut.dart';
 export 'src/imaging/window_presets.dart';
 
 // Widgets
 export 'src/widgets/dicom_viewport.dart';
 export 'src/widgets/viewport_controller.dart';
+export 'src/widgets/viewport_gesture_detector.dart';
 export 'src/widgets/overlays.dart';
 export 'src/widgets/qido_browser_dialog.dart';
+
+// Persistence
+export 'src/persistence/server_url_store.dart';

@@ -39,6 +39,21 @@ class DicomViewerApp extends StatelessWidget {
   }
 }
 
+/// Clinical viewport grid layout options: 1 on 1, 2 on 1, 4 on 1, 9 on 1.
+enum ViewportLayout {
+  oneOnOne('1 on 1 (1×1)', 1, 1),
+  twoOnOne('2 on 1 (1×2)', 1, 2),
+  fourOnOne('4 on 1 (2×2)', 2, 2),
+  nineOnOne('9 on 1 (3×3)', 3, 3);
+
+  final String label;
+  final int rows;
+  final int cols;
+  const ViewportLayout(this.label, this.rows, this.cols);
+
+  int get count => rows * cols;
+}
+
 class DicomViewerWorkbench extends StatefulWidget {
   const DicomViewerWorkbench({super.key});
 
@@ -47,7 +62,10 @@ class DicomViewerWorkbench extends StatefulWidget {
 }
 
 class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
-  late final ViewportController _controller;
+  // Pool of 9 controllers for up to 3x3 layout
+  late final List<ViewportController> _controllers;
+  ViewportLayout _layout = ViewportLayout.oneOnOne;
+
   bool _showOverlay = true;
   String _selectedFixture = 'CT Phantom';
   bool _sidebarExpanded = true;
@@ -55,93 +73,164 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   DicomSeriesBuffer? _loadedSeries;
   int _currentFrameIndex = 0;
   bool _isLoadingFrame = false;
+  late String _activeServerUrl;
+
+  // In-memory persistent presentation states per frame index
+  final Map<int, DicomPresentationState> _framePresentationCache = {};
+
+  ViewportController get _primaryController => _controllers[0];
 
   @override
   void initState() {
     super.initState();
-    _controller = ViewportController();
+    _activeServerUrl = DicomServerUrlStore.getLastUsedUrl();
+
+    _controllers = List.generate(9, (index) {
+      final controller = ViewportController();
+      controller.onSliceStep = (direction) {
+        if (_loadedSeries != null && _loadedSeries!.frameCount > 1) {
+          final nextIdx = (_currentFrameIndex + direction).clamp(0, _loadedSeries!.frameCount - 1);
+          if (nextIdx != _currentFrameIndex) {
+            _goToFrame(nextIdx);
+          }
+        }
+      };
+
+      // Live propagation hook: save presentation state per frame
+      controller.onPresentationChanged = (state) {
+        final frameNum = controller.frameIndex;
+        if (frameNum != null && frameNum > 0) {
+          _framePresentationCache[frameNum - 1] = state;
+        }
+      };
+
+      return controller;
+    });
+
     _loadCtPhantom();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _loadedSeries?.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _loadCtPhantom() {
+    _loadedSeries?.dispose();
     _loadedSeries = null;
+    _framePresentationCache.clear();
     final frame = SyntheticPatterns.generateCtPhantom();
-    _controller.setFrame(frame);
-    _controller.applyPreset(WindowPresets.softTissue);
-    _controller.updateMetadata(
-      patientName: 'DOE^JOHN',
-      patientId: 'SYN-CT-90210',
-      studyDescription: 'CT THORAX W/ CONTRAST',
-      seriesDescription: 'AXIAL 5.0mm SOFT TISSUE',
-    );
-    setState(() => _selectedFixture = 'CT Phantom');
+
+    for (int i = 0; i < _controllers.length; i++) {
+      if (i == 0) {
+        _controllers[i].resetZoomPan(notify: false);
+        _controllers[i].setFrame(frame);
+        _controllers[i].applyPreset(WindowPresets.softTissue);
+        _controllers[i].updateMetadata(
+          patientName: 'DOE^JOHN',
+          patientId: 'SYN-CT-90210',
+          studyDescription: 'CT THORAX W/ CONTRAST',
+          seriesDescription: 'AXIAL 5.0mm SOFT TISSUE',
+          frameIndex: 1,
+          totalFrames: 1,
+        );
+      } else {
+        _controllers[i].clear();
+      }
+    }
+    setState(() {
+      _currentFrameIndex = 0;
+      _selectedFixture = 'CT Phantom';
+    });
   }
 
   void _loadTg18Qc() {
+    _loadedSeries?.dispose();
     _loadedSeries = null;
+    _framePresentationCache.clear();
     final frame = SyntheticPatterns.generateTg18QcPattern();
-    _controller.setFrame(frame);
-    _controller.setWindowLevel(2048, 4096);
-    _controller.updateMetadata(
-      patientName: 'QUALITY^CONTROL',
-      patientId: 'QC-TG18-001',
-      studyDescription: 'TG18-QC DISPLAY CALIBRATION',
-      seriesDescription: 'SMPTE DYNAMIC RANGE TEST',
-    );
-    setState(() => _selectedFixture = 'TG18-QC Test Pattern');
+
+    for (int i = 0; i < _controllers.length; i++) {
+      if (i == 0) {
+        _controllers[i].resetZoomPan(notify: false);
+        _controllers[i].setFrame(frame);
+        _controllers[i].setWindowLevel(2048, 4096);
+        _controllers[i].updateMetadata(
+          patientName: 'QUALITY^CONTROL',
+          patientId: 'QC-TG18-001',
+          studyDescription: 'TG18-QC DISPLAY CALIBRATION',
+          seriesDescription: 'SMPTE DYNAMIC RANGE TEST',
+          frameIndex: 1,
+          totalFrames: 1,
+        );
+      } else {
+        _controllers[i].clear();
+      }
+    }
+    setState(() {
+      _currentFrameIndex = 0;
+      _selectedFixture = 'TG18-QC Test Pattern';
+    });
   }
 
   void _loadDynamicRamp() {
+    _loadedSeries?.dispose();
     _loadedSeries = null;
+    _framePresentationCache.clear();
     final frame = SyntheticPatterns.generateDynamicRamp();
-    _controller.setFrame(frame);
-    _controller.setWindowLevel(250, 2500);
-    _controller.updateMetadata(
-      patientName: 'CALIBRATION^RAMP',
-      patientId: 'RAMP-16BIT-002',
-      studyDescription: 'CONTINUOUS 16-BIT HU GRADIENT',
-      seriesDescription: '-1000 HU TO +2500 HU RAMP',
-    );
-    setState(() => _selectedFixture = 'Dynamic Ramp');
+
+    for (int i = 0; i < _controllers.length; i++) {
+      if (i == 0) {
+        _controllers[i].resetZoomPan(notify: false);
+        _controllers[i].setFrame(frame);
+        _controllers[i].setWindowLevel(250, 2500);
+        _controllers[i].updateMetadata(
+          patientName: 'CALIBRATION^RAMP',
+          patientId: 'RAMP-16BIT-002',
+          studyDescription: 'CONTINUOUS 16-BIT HU GRADIENT',
+          seriesDescription: '-1000 HU TO +2500 HU RAMP',
+          frameIndex: 1,
+          totalFrames: 1,
+        );
+      } else {
+        _controllers[i].clear();
+      }
+    }
+    setState(() {
+      _currentFrameIndex = 0;
+      _selectedFixture = 'Dynamic Ramp';
+    });
   }
 
   Future<void> _openQidoBrowser() async {
     await QidoBrowserDialog.show(
       context,
-      initialServerUrl: 'http://localhost:8000',
+      onStudySelected: (study) {
+        _loadedSeries?.dispose();
+        _loadedSeries = null;
+        _framePresentationCache.clear();
+        for (final c in _controllers) {
+          c.clear();
+        }
+        setState(() {
+          _currentFrameIndex = 0;
+          _selectedFixture = 'Loading: ${study.patientName}';
+        });
+      },
       onSeriesLoaded: (seriesBuffer, initialFrame) {
+        _loadedSeries?.dispose();
+        _framePresentationCache.clear();
         setState(() {
           _loadedSeries = seriesBuffer;
           _currentFrameIndex = 0;
           _selectedFixture = 'QIDO: ${seriesBuffer.series.seriesDescription}';
         });
 
-        final is8Bit = initialFrame.bitsAllocated <= 8 || initialFrame.rawPixels is Uint8List;
-        if (is8Bit) {
-          _controller.setWindowLevel(128.0, 256.0);
-          _controller.setFrame(initialFrame, updateWindowLevelFromFrame: false);
-        } else {
-          final metaCenter = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowCenter : null;
-          final metaWidth = seriesBuffer.frames.isNotEmpty ? seriesBuffer.frames.first.metadata.windowWidth : null;
-          if (metaCenter != null && metaWidth != null && metaWidth > 1.0) {
-            _controller.setWindowLevel(metaCenter, metaWidth);
-            _controller.setFrame(initialFrame, updateWindowLevelFromFrame: false);
-          } else {
-            _controller.setFrame(initialFrame, updateWindowLevelFromFrame: true);
-          }
-        }
-        _controller.updateMetadata(
-          patientName: seriesBuffer.study?.patientName ?? 'Anonymous',
-          patientId: seriesBuffer.study?.patientId ?? '-',
-          studyDescription: seriesBuffer.study?.studyDescription ?? 'DICOM Study',
-          seriesDescription: seriesBuffer.series.seriesDescription,
-        );
+        _syncGridLayoutFrames();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -154,6 +243,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         );
       },
     );
+    if (mounted) {
+      setState(() {
+        _activeServerUrl = DicomServerUrlStore.getLastUsedUrl();
+      });
+    }
   }
 
   Future<void> _goToFrame(int index) async {
@@ -166,15 +260,78 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     });
 
     try {
-      final frame = await _loadedSeries!.getPixelFrame(index);
-      if (frame != null && mounted) {
-        _controller.setFrame(frame);
-      }
+      await _syncGridLayoutFrames();
     } finally {
       if (mounted) {
         setState(() => _isLoadingFrame = false);
       }
     }
+  }
+
+  /// Synchronizes frame decoding and presentation states across all active grid slots.
+  Future<void> _syncGridLayoutFrames() async {
+    if (_loadedSeries == null) return;
+
+    final totalCount = _loadedSeries!.frameCount;
+    final activeSlots = _layout.count;
+
+    for (int slot = 0; slot < 9; slot++) {
+      final controller = _controllers[slot];
+      if (slot < activeSlots) {
+        final frameIdx = _currentFrameIndex + slot;
+        if (frameIdx < totalCount) {
+          final pixelFrame = await _loadedSeries!.getPixelFrame(frameIdx);
+          if (pixelFrame != null && mounted) {
+            // Apply or restore per-frame presentation state
+            final cachedState = _framePresentationCache[frameIdx];
+            if (cachedState != null) {
+              controller.applyPresentationState(cachedState, notify: false);
+              controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+            } else {
+              controller.resetZoomPan(notify: false);
+              final is8Bit = pixelFrame.bitsAllocated <= 8 || pixelFrame.rawPixels is Uint8List;
+              if (is8Bit) {
+                controller.setWindowLevel(128.0, 256.0);
+                controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+              } else {
+                final metaCenter = _loadedSeries!.frames.isNotEmpty
+                    ? _loadedSeries!.frames[frameIdx < _loadedSeries!.frames.length ? frameIdx : 0].metadata.windowCenter
+                    : null;
+                final metaWidth = _loadedSeries!.frames.isNotEmpty
+                    ? _loadedSeries!.frames[frameIdx < _loadedSeries!.frames.length ? frameIdx : 0].metadata.windowWidth
+                    : null;
+                if (metaCenter != null && metaWidth != null && metaWidth > 1.0) {
+                  controller.setWindowLevel(metaCenter, metaWidth);
+                  controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+                } else {
+                  controller.setFrame(pixelFrame, updateWindowLevelFromFrame: true);
+                }
+              }
+            }
+
+            controller.updateMetadata(
+              patientName: _loadedSeries!.study?.patientName ?? 'Anonymous',
+              patientId: _loadedSeries!.study?.patientId ?? '-',
+              studyDescription: _loadedSeries!.study?.studyDescription ?? 'DICOM Study',
+              seriesDescription: _loadedSeries!.series.seriesDescription,
+              frameIndex: frameIdx + 1,
+              totalFrames: totalCount,
+            );
+          }
+        } else {
+          controller.clear();
+        }
+      } else {
+        controller.clear();
+      }
+    }
+  }
+
+  void _setLayout(ViewportLayout layout) {
+    setState(() {
+      _layout = layout;
+    });
+    _syncGridLayoutFrames();
   }
 
   @override
@@ -207,6 +364,20 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             ),
           ),
           const SizedBox(width: 8),
+
+          // Layout Grid Selector Menu
+          PopupMenuButton<ViewportLayout>(
+            icon: const Icon(Icons.grid_view_rounded, color: Color(0xFF58A6FF)),
+            tooltip: 'Layout Grid ([1, 2, 4, 9] on 1)',
+            onSelected: _setLayout,
+            itemBuilder: (context) => [
+              _buildLayoutMenuItem(ViewportLayout.oneOnOne, Icons.crop_square_rounded),
+              _buildLayoutMenuItem(ViewportLayout.twoOnOne, Icons.view_agenda_rounded),
+              _buildLayoutMenuItem(ViewportLayout.fourOnOne, Icons.grid_view_rounded),
+              _buildLayoutMenuItem(ViewportLayout.nineOnOne, Icons.apps_rounded),
+            ],
+          ),
+
           IconButton(
             icon: Icon(_showOverlay ? Icons.layers : Icons.layers_clear),
             tooltip: 'Toggle HUD Overlays',
@@ -214,18 +385,22 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           ),
           IconButton(
             icon: const Icon(Icons.zoom_in),
-            tooltip: 'Zoom In',
-            onPressed: () => _controller.setZoom(_controller.zoom + 0.25),
+            tooltip: 'Zoom In Primary',
+            onPressed: () => _primaryController.setZoom(_primaryController.zoom + 0.25),
           ),
           IconButton(
             icon: const Icon(Icons.zoom_out),
-            tooltip: 'Zoom Out',
-            onPressed: () => _controller.setZoom(_controller.zoom - 0.25),
+            tooltip: 'Zoom Out Primary',
+            onPressed: () => _primaryController.setZoom(_primaryController.zoom - 0.25),
           ),
           IconButton(
             icon: const Icon(Icons.restart_alt),
             tooltip: 'Reset View & Presets',
-            onPressed: () => _controller.resetView(),
+            onPressed: () {
+              for (final c in _controllers) {
+                c.resetView();
+              }
+            },
           ),
           const SizedBox(width: 8),
           IconButton(
@@ -238,12 +413,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       ),
       body: Row(
         children: [
-          // Main Viewport
+          // Main Viewport Area: 1, 2, 4, or 9 on 1 Grid
           Expanded(
-            child: DicomViewport(
-              controller: _controller,
-              showOverlay: _showOverlay,
-            ),
+            child: _buildViewportGrid(),
           ),
 
           // Control & Inspector Sidebar
@@ -261,11 +433,143 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     );
   }
 
+  PopupMenuItem<ViewportLayout> _buildLayoutMenuItem(ViewportLayout layout, IconData icon) {
+    final isSelected = _layout == layout;
+    return PopupMenuItem<ViewportLayout>(
+      value: layout,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: isSelected ? const Color(0xFF58A6FF) : const Color(0xFF8B949E)),
+          const SizedBox(width: 10),
+          Text(
+            layout.label,
+            style: TextStyle(
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected ? const Color(0xFF58A6FF) : Colors.white,
+            ),
+          ),
+          if (isSelected) ...[
+            const Spacer(),
+            const Icon(Icons.check, size: 16, color: Color(0xFF58A6FF)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewportGrid() {
+    switch (_layout) {
+      case ViewportLayout.oneOnOne:
+        return DicomViewport(
+          controller: _controllers[0],
+          showOverlay: _showOverlay,
+        );
+
+      case ViewportLayout.twoOnOne:
+        return Row(
+          children: [
+            Expanded(
+              child: DicomViewport(
+                controller: _controllers[0],
+                showOverlay: _showOverlay,
+              ),
+            ),
+            const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+            Expanded(
+              child: DicomViewport(
+                controller: _controllers[1],
+                showOverlay: _showOverlay,
+              ),
+            ),
+          ],
+        );
+
+      case ViewportLayout.fourOnOne:
+        return Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DicomViewport(
+                      controller: _controllers[0],
+                      showOverlay: _showOverlay,
+                    ),
+                  ),
+                  const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                  Expanded(
+                    child: DicomViewport(
+                      controller: _controllers[1],
+                      showOverlay: _showOverlay,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 2, thickness: 2, color: Color(0xFF30363D)),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DicomViewport(
+                      controller: _controllers[2],
+                      showOverlay: _showOverlay,
+                    ),
+                  ),
+                  const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                  Expanded(
+                    child: DicomViewport(
+                      controller: _controllers[3],
+                      showOverlay: _showOverlay,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case ViewportLayout.nineOnOne:
+        return Column(
+          children: List.generate(3, (row) {
+            return Expanded(
+              child: Column(
+                children: [
+                  if (row > 0) const Divider(height: 2, thickness: 2, color: Color(0xFF30363D)),
+                  Expanded(
+                    child: Row(
+                      children: List.generate(3, (col) {
+                        final slot = row * 3 + col;
+                        return Expanded(
+                          child: Row(
+                            children: [
+                              if (col > 0)
+                                const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                              Expanded(
+                                child: DicomViewport(
+                                  controller: _controllers[slot],
+                                  showOverlay: _showOverlay,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        );
+    }
+  }
+
   Widget _buildSidebar() {
     return ListenableBuilder(
-      listenable: _controller,
+      listenable: _primaryController,
       builder: (context, _) {
-        final frame = _controller.currentFrame;
+        final frame = _primaryController.currentFrame;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -290,6 +594,22 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 side: const BorderSide(color: Color(0xFF388BFD)),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.dns_outlined, size: 12, color: Color(0xFF58A6FF)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Root: $_activeServerUrl',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E), fontFamily: 'monospace'),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
             if (_loadedSeries != null && _loadedSeries!.frameCount > 1) ...[
               const Divider(height: 32, color: Color(0xFF30363D)),
@@ -298,7 +618,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Frame ${_currentFrameIndex + 1} / ${_loadedSeries!.frameCount}',
+                    'Base Frame ${_currentFrameIndex + 1} / ${_loadedSeries!.frameCount}',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
                   ),
                   if (_isLoadingFrame)
@@ -349,18 +669,41 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
             const Divider(height: 32, color: Color(0xFF30363D)),
 
+            // Viewport Grid Layout Selector
+            _buildSectionHeader('VIEWPORT LAYOUT'),
+            Wrap(
+              spacing: 8,
+              children: ViewportLayout.values.map((layout) {
+                final isSelected = _layout == layout;
+                return ChoiceChip(
+                  label: Text(layout.label, style: const TextStyle(fontSize: 11)),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) _setLayout(layout);
+                  },
+                  selectedColor: const Color(0xFF1F6FEB),
+                  backgroundColor: const Color(0xFF21262D),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFFC9D1D9),
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const Divider(height: 32, color: Color(0xFF30363D)),
+
             // Clinical Window Presets
-            _buildSectionHeader('CLINICAL PRESETS'),
+            _buildSectionHeader('PRIMARY CLINICAL PRESETS'),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: WindowPresets.all.map((preset) {
-                final isSelected = _controller.activePreset == preset;
+                final isSelected = _primaryController.activePreset == preset;
                 return ChoiceChip(
                   label: Text(preset.name, style: const TextStyle(fontSize: 11)),
                   selected: isSelected,
                   onSelected: (selected) {
-                    if (selected) _controller.applyPreset(preset);
+                    if (selected) _primaryController.applyPreset(preset);
                   },
                   selectedColor: const Color(0xFF1F6FEB),
                   backgroundColor: const Color(0xFF21262D),
@@ -374,51 +717,52 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             const Divider(height: 32, color: Color(0xFF30363D)),
 
             // Dynamic Window Level Controls
-            _buildSectionHeader('WINDOW & LEVEL (HU)'),
+            _buildSectionHeader('PRIMARY WINDOW & LEVEL (HU)'),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Center (C):', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                Text('${_controller.windowCenter.toStringAsFixed(1)} HU',
+                Text('${_primaryController.windowCenter.toStringAsFixed(1)} HU',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
             Slider(
-              value: _controller.windowCenter.clamp(-1000.0, 3000.0),
+              value: _primaryController.windowCenter.clamp(-1000.0, 3000.0),
               min: -1000.0,
               max: 3000.0,
               onChanged: (val) {
-                _controller.setWindowLevel(val, _controller.windowWidth);
+                _primaryController.setWindowLevel(val, _primaryController.windowWidth);
               },
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Width (W):', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                Text('${_controller.windowWidth.toStringAsFixed(1)} HU',
+                Text('${_primaryController.windowWidth.toStringAsFixed(1)} HU',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
             Slider(
-              value: _controller.windowWidth.clamp(1.0, 4000.0),
+              value: _primaryController.windowWidth.clamp(1.0, 4000.0),
               min: 1.0,
               max: 4000.0,
               onChanged: (val) {
-                _controller.setWindowLevel(_controller.windowCenter, val);
+                _primaryController.setWindowLevel(_primaryController.windowCenter, val);
               },
             ),
 
             const Divider(height: 32, color: Color(0xFF30363D)),
 
             // Zoom & Transform Inspector
-            _buildSectionHeader('VIEWPORT TRANSFORM'),
-            _buildInfoRow('Zoom Scale', '${(_controller.zoom * 100).toStringAsFixed(0)}%'),
-            _buildInfoRow('Pan Offset', '(${_controller.panOffset.dx.toStringAsFixed(1)}, ${_controller.panOffset.dy.toStringAsFixed(1)})'),
+            _buildSectionHeader('PRIMARY VIEWPORT TRANSFORM'),
+            _buildInfoRow('Zoom Scale', '${(_primaryController.zoom * 100).toStringAsFixed(0)}%'),
+            _buildInfoRow('Pan Offset',
+                '(${_primaryController.panOffset.dx.toStringAsFixed(1)}, ${_primaryController.panOffset.dy.toStringAsFixed(1)})'),
 
             const Divider(height: 32, color: Color(0xFF30363D)),
 
             // DICOM Frame Metadata
-            _buildSectionHeader('FRAME METADATA'),
+            _buildSectionHeader('PRIMARY FRAME METADATA'),
             if (frame != null) ...[
               _buildInfoRow('Dimensions', '${frame.width} × ${frame.height}'),
               _buildInfoRow('Photometric', frame.photometricInterpretation),

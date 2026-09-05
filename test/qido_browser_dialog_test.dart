@@ -91,5 +91,97 @@ void main() {
     expect(find.text('20 instance(s) • Dr. SMITH, ALICE'), findsOneWidget);
     expect(find.text('Download & View Series'), findsOneWidget);
   });
+
+  testWidgets('QidoBrowserDialog pulls down past server roots and selects one', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      DicomServerUrlStore.clear();
+    });
+
+    DicomServerUrlStore.clear();
+    DicomServerUrlStore.recordUrl('http://server-alpha.local:8000');
+    DicomServerUrlStore.recordUrl('http://server-beta.local:8042');
+    DicomServerUrlStore.recordUrl('http://server-gamma.local:9000');
+
+    final mockClient = MockClient((request) async {
+      return http.Response('[]', 200, headers: {'content-type': 'application/json'});
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QidoBrowserDialog(
+            httpClient: mockClient,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify that the initial URL loaded from DicomServerUrlStore is server-gamma (most recently recorded)
+    expect(find.text('http://server-gamma.local:9000'), findsOneWidget);
+
+    // Tap on the pull-down arrow to open history menu
+    final pullDownArrow = find.byTooltip('Recent DICOMweb Roots');
+    expect(pullDownArrow, findsOneWidget);
+    await tester.tap(pullDownArrow);
+    await tester.pumpAndSettle();
+
+    // Verify the history entries appear in the pull down menu
+    expect(find.text('http://server-alpha.local:8000'), findsOneWidget);
+    expect(find.text('http://server-beta.local:8042'), findsOneWidget);
+    expect(find.text('http://server-gamma.local:9000'), findsAtLeast(1));
+
+    // Tap on server-alpha to select it
+    await tester.tap(find.text('http://server-alpha.local:8000'));
+    await tester.pumpAndSettle();
+
+    // Verify text field now displays server-alpha
+    expect(find.text('http://server-alpha.local:8000'), findsOneWidget);
+    // Verify DicomServerUrlStore updated last used URL to server-alpha
+    expect(DicomServerUrlStore.getLastUsedUrl(), equals('http://server-alpha.local:8000'));
+    expect(DicomServerUrlStore.getHistory().first, equals('http://server-alpha.local:8000'));
+  });
+
+  testWidgets('QidoBrowserDialog allows typing a new URL and records it to history upon query', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      DicomServerUrlStore.clear();
+    });
+
+    DicomServerUrlStore.clear();
+
+    final mockClient = MockClient((request) async {
+      return http.Response('[]', 200, headers: {'content-type': 'application/json'});
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QidoBrowserDialog(
+            httpClient: mockClient,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Enter a new server root URL
+    final urlField = find.widgetWithText(TextField, 'http://localhost:8000');
+    await tester.enterText(urlField, 'http://new-pacs.hospital.org:8042/dicom-web');
+    await tester.pumpAndSettle();
+
+    // Click Query QIDO button
+    await tester.tap(find.text('Query QIDO'));
+    await tester.pumpAndSettle();
+
+    // Verify recorded into history and last used
+    expect(DicomServerUrlStore.getLastUsedUrl(), equals('http://new-pacs.hospital.org:8042/dicom-web'));
+    expect(DicomServerUrlStore.getHistory(), contains('http://new-pacs.hospital.org:8042/dicom-web'));
+  });
 }
 

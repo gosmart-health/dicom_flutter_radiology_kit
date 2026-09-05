@@ -1,14 +1,19 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'decoder_interface.dart';
 
-/// VM / Non-browser fallback for WasmWorkerBridge.
+/// VM / Non-browser fallback for WasmWorkerBridge offloading to background Dart isolates.
 class WasmWorkerBridge implements FrameDecoder {
   Future<void> initialize() async {}
 
   @override
   Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options) async {
+    return await Isolate.run(() => _decodeFrameSync(encodedBytes, options));
+  }
+
+  static DecodeResult _decodeFrameSync(Uint8List encodedBytes, DecodeOptions options) {
     final numPixels = options.width * options.height;
     final TypedData pixels;
 
@@ -136,6 +141,112 @@ class WasmWorkerBridge implements FrameDecoder {
     } catch (_) {
       return decodeFrame(encodedBytes, options);
     }
+  }
+
+  Future<DecodeResult> decodeRle(Uint8List encodedBytes, DecodeOptions options) async {
+    return await Isolate.run(() => _decodeRleSync(encodedBytes, options));
+  }
+
+  static DecodeResult _decodeRleSync(Uint8List bytes, DecodeOptions options) {
+    final numPixels = options.width * options.height;
+    if (bytes.length < 64) {
+      return _decodeFrameSync(bytes, options);
+    }
+
+    final byteData = ByteData.sublistView(bytes);
+    final numSegments = byteData.getUint32(0, Endian.little);
+    if (numSegments < 1 || numSegments > 15) {
+      return _decodeFrameSync(bytes, options);
+    }
+
+    final segmentOffsets = <int>[];
+    for (int s = 0; s < numSegments; s++) {
+      segmentOffsets.add(byteData.getUint32((s + 1) * 4, Endian.little));
+    }
+
+    final decompressedSegments = <Uint8List>[];
+    for (int s = 0; s < numSegments; s++) {
+      final start = segmentOffsets[s];
+      final end = (s + 1 < numSegments) ? segmentOffsets[s + 1] : bytes.length;
+      if (start >= bytes.length) break;
+
+      final segData = _unpackPackBitsFast(bytes, start, end.clamp(start, bytes.length), numPixels);
+      decompressedSegments.add(segData);
+    }
+
+    final TypedData pixels;
+    if (options.bitsAllocated == 16 && decompressedSegments.length >= 2) {
+      final msb = decompressedSegments[0];
+      final lsb = decompressedSegments[1];
+      if (options.isSigned) {
+        final list = Int16List(numPixels);
+        for (int i = 0; i < numPixels; i++) {
+          final m = i < msb.length ? msb[i] : 0;
+          final l = i < lsb.length ? lsb[i] : 0;
+          final val = (m << 8) | l;
+          list[i] = val > 32767 ? val - 65536 : val;
+        }
+        pixels = list;
+      } else {
+        final list = Uint16List(numPixels);
+        for (int i = 0; i < numPixels; i++) {
+          final m = i < msb.length ? msb[i] : 0;
+          final l = i < lsb.length ? lsb[i] : 0;
+          final val = (m << 8) | l;
+          list[i] = val;
+        }
+        pixels = list;
+      }
+    } else if (decompressedSegments.isNotEmpty) {
+      pixels = decompressedSegments[0];
+    } else {
+      return _decodeFrameSync(bytes, options);
+    }
+
+    return DecodeResult(
+      pixelData: pixels,
+      width: options.width,
+      height: options.height,
+      bitsAllocated: options.bitsAllocated,
+      bitsStored: options.bitsStored,
+      isSigned: options.isSigned,
+    );
+  }
+
+  static Uint8List _unpackPackBitsFast(Uint8List input, int start, int end, int expectedSize) {
+    final output = Uint8List(expectedSize);
+    int inIdx = start;
+    int outIdx = 0;
+
+    while (inIdx < end && outIdx < expectedSize) {
+      final n = input[inIdx++];
+      if (n <= 127) {
+        final count = n + 1;
+        final availableIn = end - inIdx;
+        final neededOut = expectedSize - outIdx;
+        final copyLen = count < availableIn ? (count < neededOut ? count : neededOut) : (availableIn < neededOut ? availableIn : neededOut);
+        if (copyLen > 0) {
+          output.setRange(outIdx, outIdx + copyLen, input, inIdx);
+          inIdx += count;
+          outIdx += copyLen;
+        } else {
+          inIdx += count;
+        }
+      } else if (n >= 129) {
+        final count = 257 - n;
+        if (inIdx < end) {
+          final val = input[inIdx++];
+          final neededOut = expectedSize - outIdx;
+          final fillLen = count < neededOut ? count : neededOut;
+          if (fillLen > 0) {
+            output.fillRange(outIdx, outIdx + fillLen, val);
+            outIdx += fillLen;
+          }
+        }
+      }
+      // n == 128 is a no-op
+    }
+    return output;
   }
 
   void dispose() {}
