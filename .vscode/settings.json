@@ -1,0 +1,14 @@
+{
+  "dart.flutterSdkPath": ".fvm/flutter_sdk",
+  "search.exclude": {
+    "**/.fvm": true
+  },
+  "files.watcherExclude": {
+    "**/.fvm": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.git/index*": true
+  },
+  "gitlens.enabled": false,
+  "gitlens.mode.active": "zen"
+}

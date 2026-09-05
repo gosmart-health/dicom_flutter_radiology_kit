@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="DICOM Flutter Radiology Kit Test Viewer & Workbench">
+
+  <!-- Mobile meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="DICOM Viewer">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>DICOM Flutter Radiology Kit Test Viewer</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    // Unregister any stale coi-serviceworker to prevent forced Skwasm unaligned memory crashes
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          if (registration.active && registration.active.scriptURL.includes('coi-serviceworker')) {
+            registration.unregister().then(function(unregistered) {
+              if (unregistered) console.log('[SW] Successfully unregistered stale coi-serviceworker');
+            });
+          }
+        }
+      });
+    }
+  </script>
+  <script src="openjpegwasm.js"></script>
+</head>
+<body style="margin: 0; background-color: #0d1117; overflow: hidden;">
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

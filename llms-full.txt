@@ -1,0 +1,179 @@
+# dicom_flutter_radiology_kit — Full API Specification & Reference Manual
+
+## Module 1: Client (`lib/src/client/`)
+
+### `DicomWebClient`
+WADO-RS and QIDO-RS REST service interface for DICOMweb backends.
+
+```dart
+class DicomWebClient {
+  final String baseUrl;
+  final Map<String, String>? headers;
+
+  DicomWebClient({required this.baseUrl, this.headers});
+
+  /// Fetches instance metadata (JSON DICOM dataset) for a given study/series.
+  Future<List<Map<String, dynamic>>> fetchInstanceMetadata({
+    required String studyInstanceUID,
+    required String seriesInstanceUID,
+  });
+
+  /// Streams raw frames via WADO-RS RetrieveFrames.
+  Stream<List<int>> streamFrameData({
+    required String studyInstanceUID,
+    required String seriesInstanceUID,
+    required String sopInstanceUID,
+    required int frameIndex,
+  });
+}
+```
+
+### `MultipartStreamReader`
+Parses HTTP `multipart/related` responses into individual binary DICOM frame chunks.
+
+```dart
+class MultipartStreamReader {
+  static Stream<Uint8List> parseMultipartStream(
+    Stream<List<int>> byteStream,
+    String boundary,
+  );
+}
+```
+
+---
+
+## Module 2: Codecs (`lib/src/codecs/`)
+
+### `FrameDecoder`
+Interface contract for decoding encoded DICOM frame payloads.
+
+```dart
+abstract class FrameDecoder {
+  Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options);
+}
+
+class DecodeResult {
+  final TypedData pixelData; // Int16List or Uint16List
+  final int width;
+  final int height;
+  final int bitsAllocated;
+  final int bitsStored;
+  final bool isSigned;
+
+  DecodeResult({
+    required this.pixelData,
+    required this.width,
+    required this.height,
+    required this.bitsAllocated,
+    required this.bitsStored,
+    required this.isSigned,
+  });
+}
+```
+
+### `WasmWorkerBridge`
+Spawns `web/j2k_worker.js` Web Worker using `package:web` and manages transferrable zero-copy `ArrayBuffer` exchanges.
+
+```dart
+class WasmWorkerBridge implements FrameDecoder {
+  Future<void> initialize();
+  @override
+  Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options);
+  void dispose();
+}
+```
+
+### `CodecRouter`
+Routes DICOM Transfer Syntax UIDs to appropriate decoders (Uncompressed vs WASM Worker J2K/HTJ2K).
+
+```dart
+class CodecRouter {
+  static Future<DecodeResult> decode({
+    required String transferSyntaxUID,
+    required Uint8List frameBytes,
+    required DecodeOptions options,
+  });
+}
+```
+
+---
+
+## Module 3: Imaging (`lib/src/imaging/`)
+
+### `PixelFrame`
+Preserves original 16-bit scalar pixel buffers without premature 8-bit quantization.
+
+```dart
+class PixelFrame {
+  final TypedData rawPixels; // Int16List or Uint16List
+  final int width;
+  final int height;
+  final double rescaleSlope;
+  final double rescaleIntercept;
+  final String photometricInterpretation;
+
+  PixelFrame({
+    required this.rawPixels,
+    required this.width,
+    required this.height,
+    this.rescaleSlope = 1.0,
+    this.rescaleIntercept = 0.0,
+    this.photometricInterpretation = 'MONOCHROME2',
+  });
+}
+```
+
+### `VoiLut`
+Dynamic Window Center and Window Width (VOI LUT) pipeline.
+
+```dart
+class VoiLut {
+  /// Transforms 16-bit scalar values to 32-bit RGBA byte array based on window center/width.
+  static Uint8List applyVoiLut({
+    required PixelFrame frame,
+    required double windowCenter,
+    required double windowWidth,
+  });
+}
+```
+
+### `WindowPresets`
+Clinical DICOM window level presets (Hounsfield Units).
+
+```dart
+class WindowPreset {
+  final String name;
+  final double center;
+  final double width;
+
+  const WindowPreset(this.name, this.center, this.width);
+}
+
+class WindowPresets {
+  static const softTissue = WindowPreset('Soft Tissue', 40, 400);
+  static const bone = WindowPreset('Bone', 400, 1800);
+  static const lung = WindowPreset('Lung', -600, 1500);
+  static const brain = WindowPreset('Brain', 40, 80);
+  static const abdomen = WindowPreset('Abdomen', 50, 350);
+}
+```
+
+---
+
+## Module 4: Widgets (`lib/src/widgets/`)
+
+### `DicomViewport` & `ViewportController`
+Interactive viewport for medical imaging.
+
+```dart
+class DicomViewport extends StatefulWidget {
+  final ViewportController controller;
+  final bool showOverlay;
+
+  const DicomViewport({
+    super.key,
+    required this.controller,
+    this.showOverlay = true,
+  });
+}
+```
