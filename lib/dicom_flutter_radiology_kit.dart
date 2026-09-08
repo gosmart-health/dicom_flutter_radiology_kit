@@ -14,9 +14,19 @@ export 'src/codecs/codec_router.dart';
 
 // Imaging
 export 'src/imaging/pixel_frame.dart';
+export 'src/imaging/pixel_spacing.dart';
 export 'src/imaging/presentation_state.dart';
 export 'src/imaging/voi_lut.dart';
 export 'src/imaging/window_presets.dart';
+
+// Annotations
+export 'src/annotations/annotation_model.dart';
+export 'src/annotations/annotation_style.dart';
+export 'src/annotations/annotation_transform.dart';
+export 'src/annotations/annotation_painter.dart';
+export 'src/annotations/annotation_controller.dart';
+export 'src/annotations/dicom_annotation_layer.dart';
+export 'src/annotations/gsps_codec.dart';
 
 // Widgets
 export 'src/widgets/dicom_viewport.dart';

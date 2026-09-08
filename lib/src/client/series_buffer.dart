@@ -69,6 +69,7 @@ class DicomFrameBuffer {
       bitsAllocated: decodeResult.bitsAllocated,
       bitsStored: decodeResult.bitsStored,
       isSigned: decodeResult.isSigned,
+      pixelSpacing: metadata.pixelSpacing,
     );
   }
 }

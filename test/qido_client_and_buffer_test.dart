@@ -127,6 +127,10 @@ void main() {
             'vr': 'CS',
             'Value': ['MONOCHROME2']
           },
+          '00280030': {
+            'vr': 'DS',
+            'Value': [0.661468, 0.661468]
+          },
         }
       ]);
 
@@ -205,6 +209,9 @@ void main() {
       expect(pixelFrame.bitsAllocated, 16);
       expect(pixelFrame.rescaleIntercept, -1000.0);
       expect(pixelFrame.rescaleSlope, 1.0);
+      expect(pixelFrame.pixelSpacing, isNotNull);
+      expect(pixelFrame.pixelSpacing!.rowSpacing, 0.661468);
+      expect(pixelFrame.pixelSpacing!.columnSpacing, 0.661468);
 
       // Verify raw 16-bit scalar pixel preservation
       expect(pixelFrame.rawPixels, isA<Uint16List>());
