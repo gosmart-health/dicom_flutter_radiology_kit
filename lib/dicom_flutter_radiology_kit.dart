@@ -24,6 +24,13 @@ export 'src/widgets/viewport_controller.dart';
 export 'src/widgets/viewport_gesture_detector.dart';
 export 'src/widgets/overlays.dart';
 export 'src/widgets/qido_browser_dialog.dart';
+export 'src/widgets/dicom_dump_widget.dart';
 
 // Persistence
 export 'src/persistence/server_url_store.dart';
+
+// Dictionary & Dump
+export 'src/dictionary/dicom_tag_info.dart';
+export 'src/dictionary/dicom_dictionary.g.dart';
+export 'src/dump/dicom_dump_models.dart';
+export 'src/dump/dicom_dump_service.dart';

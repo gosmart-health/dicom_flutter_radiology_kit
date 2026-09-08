@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 
 void main() {
-  test('VoiLut and ui.decodeImageFromPixels render 16-bit frames without RangeError', () async {
+  test(
+      'VoiLut and ui.decodeImageFromPixels render 16-bit frames without RangeError',
+      () async {
     // 512x512 16-bit scalar synthetic data
     final numPixels = 512 * 512;
     final uint16Data = Uint16List(numPixels);
@@ -48,4 +50,3 @@ void main() {
     img.dispose();
   });
 }
-

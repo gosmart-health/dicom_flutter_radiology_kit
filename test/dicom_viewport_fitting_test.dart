@@ -43,14 +43,17 @@ void main() {
       required double imageHeight,
       EdgeInsets inset = const EdgeInsets.all(4.0),
     }) {
-      final availableWidth = (viewportWidth - inset.horizontal).clamp(1.0, double.infinity);
-      final availableHeight = (viewportHeight - inset.vertical).clamp(1.0, double.infinity);
+      final availableWidth =
+          (viewportWidth - inset.horizontal).clamp(1.0, double.infinity);
+      final availableHeight =
+          (viewportHeight - inset.vertical).clamp(1.0, double.infinity);
       final double scaleX = availableWidth / imageWidth;
       final double scaleY = availableHeight / imageHeight;
       return math.min(scaleX, scaleY);
     }
 
-    test('Square image in rectangular viewport fits within both dimensions', () {
+    test('Square image in rectangular viewport fits within both dimensions',
+        () {
       // 512x512 image in 400x200 viewport (e.g. 1x2 or 2x2 layout slot)
       final fitScale = computeFitScale(
         viewportWidth: 400,
@@ -103,7 +106,8 @@ void main() {
   });
 
   group('DicomViewport Widget Clipping and Rendering', () {
-    testWidgets('DicomViewport wraps tree in hard-edge ClipRect', (WidgetTester tester) async {
+    testWidgets('DicomViewport wraps tree in hard-edge ClipRect',
+        (WidgetTester tester) async {
       final controller = ViewportController();
 
       await tester.pumpWidget(
@@ -129,7 +133,8 @@ void main() {
       expect(clipRectWidget.clipBehavior, equals(Clip.hardEdge));
     });
 
-    testWidgets('DicomViewport accepts custom inset property', (WidgetTester tester) async {
+    testWidgets('DicomViewport accepts custom inset property',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       const customInset = EdgeInsets.symmetric(horizontal: 10, vertical: 20);
 
@@ -148,7 +153,8 @@ void main() {
         ),
       );
 
-      final viewportWidget = tester.widget<DicomViewport>(find.byType(DicomViewport));
+      final viewportWidget =
+          tester.widget<DicomViewport>(find.byType(DicomViewport));
       expect(viewportWidget.inset, equals(customInset));
     });
   });

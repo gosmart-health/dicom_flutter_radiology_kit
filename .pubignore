@@ -1,0 +1,22 @@
+# Build and temporary artifacts
+.dart_tool/
+.packages
+build/
+example/build/
+example/.dart_tool/
+pubspec.lock
+example/pubspec.lock
+
+# macOS
+.DS_Store
+
+# Tooling and internal development
+.fvm/
+tool/
+AGENTS.md
+llms.txt
+llms-full.txt
+NOTICE
+
+# Internal test docker fixtures
+test/fixtures/orthanc-docker/

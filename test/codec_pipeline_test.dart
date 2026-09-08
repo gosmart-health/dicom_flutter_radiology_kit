@@ -5,7 +5,8 @@ import 'fixtures/fixture_bytes.dart';
 
 void main() {
   group('Codec Pipeline Cross-Platform Unit Tests', () {
-    test('Decodes RAW Explicit VR Little Endian 16-bit frame fixture', () async {
+    test('Decodes RAW Explicit VR Little Endian 16-bit frame fixture',
+        () async {
       const options = DecodeOptions(
         width: 512,
         height: 512,
@@ -68,7 +69,8 @@ void main() {
       expect(result.pixelData.lengthInBytes, greaterThanOrEqualTo(512 * 512));
     });
 
-    test('Decodes JPEG 2000 Lossless (1.2.840.10008.1.2.4.90) frame fixture', () async {
+    test('Decodes JPEG 2000 Lossless (1.2.840.10008.1.2.4.90) frame fixture',
+        () async {
       const options = DecodeOptions(
         width: 512,
         height: 512,
@@ -85,7 +87,8 @@ void main() {
 
       expect(result.width, 512);
       expect(result.height, 512);
-      expect(result.pixelData.lengthInBytes, greaterThanOrEqualTo(512 * 512 * 2));
+      expect(
+          result.pixelData.lengthInBytes, greaterThanOrEqualTo(512 * 512 * 2));
     });
   });
 }

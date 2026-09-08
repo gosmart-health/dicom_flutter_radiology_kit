@@ -27,7 +27,9 @@ class DicomWebClient {
     while (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);
     }
-    if (!url.endsWith('/dicomweb') && !url.endsWith('/rs') && !url.contains('/studies')) {
+    if (!url.endsWith('/dicomweb') &&
+        !url.endsWith('/rs') &&
+        !url.contains('/studies')) {
       final uri = Uri.tryParse(url);
       if (uri != null && (uri.path.isEmpty || uri.path == '/')) {
         url = '$url/dicomweb';
@@ -83,7 +85,9 @@ class DicomWebClient {
     }
 
     final List<dynamic> jsonList = json.decode(response.body);
-    return jsonList.map((item) => DicomStudy.fromJson(item as Map<String, dynamic>)).toList();
+    return jsonList
+        .map((item) => DicomStudy.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Queries series for a study via QIDO-RS `/studies/{studyInstanceUID}/series`.
@@ -104,7 +108,9 @@ class DicomWebClient {
     }
 
     final List<dynamic> jsonList = json.decode(response.body);
-    return jsonList.map((item) => DicomSeries.fromJson(item as Map<String, dynamic>)).toList();
+    return jsonList
+        .map((item) => DicomSeries.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// Queries instance summaries for a series via QIDO-RS `/studies/{studyUID}/series/{seriesUID}/instances`.
@@ -129,7 +135,8 @@ class DicomWebClient {
 
     final List<dynamic> jsonList = json.decode(response.body);
     final instances = jsonList
-        .map((item) => DicomInstanceSummary.fromJson(item as Map<String, dynamic>))
+        .map((item) =>
+            DicomInstanceSummary.fromJson(item as Map<String, dynamic>))
         .toList();
     instances.sort((a, b) => a.instanceNumber.compareTo(b.instanceNumber));
     return instances;
@@ -158,7 +165,8 @@ class DicomWebClient {
 
     final List<dynamic> jsonList = json.decode(response.body);
     final instances = jsonList
-        .map((item) => DicomInstanceSummary.fromJson(item as Map<String, dynamic>))
+        .map((item) =>
+            DicomInstanceSummary.fromJson(item as Map<String, dynamic>))
         .toList();
     instances.sort((a, b) => a.instanceNumber.compareTo(b.instanceNumber));
     return instances;
@@ -184,7 +192,8 @@ class DicomWebClient {
     final response = await _httpClient
         .get(uri, headers: requestHeaders)
         .timeout(const Duration(seconds: 15), onTimeout: () {
-      throw TimeoutException('WADO-RS frame $frameNumber timed out after 15s ($uri)');
+      throw TimeoutException(
+          'WADO-RS frame $frameNumber timed out after 15s ($uri)');
     });
 
     if (response.statusCode != 200) {
@@ -213,7 +222,8 @@ class DicomWebClient {
 
     final total = instances.length;
     final effectiveTransferSyntax = compressionMode.transferSyntaxUID;
-    print('[DICOM-CLIENT] Streaming series ${series.seriesInstanceUID} ($total frames, mode: ${compressionMode.label})');
+    print(
+        '[DICOM-CLIENT] Streaming series ${series.seriesInstanceUID} ($total frames, mode: ${compressionMode.label})');
 
     for (int i = 0; i < instances.length; i++) {
       if (targetBuffer != null && targetBuffer.isDisposed) {
@@ -313,14 +323,16 @@ class DicomWebClient {
   Uint8List _extractFramePayload(Uint8List bytes, String contentType) {
     if (bytes.isEmpty) return bytes;
 
-    final isMultipart = contentType.toLowerCase().contains('multipart') || _looksLikeMultipart(bytes);
+    final isMultipart = contentType.toLowerCase().contains('multipart') ||
+        _looksLikeMultipart(bytes);
     if (!isMultipart) {
       return bytes;
     }
 
     String? boundary;
-    final boundaryMatch = RegExp(r'boundary=(?:"([^"]+)"|([^;]+))', caseSensitive: false)
-        .firstMatch(contentType);
+    final boundaryMatch =
+        RegExp(r'boundary=(?:"([^"]+)"|([^;]+))', caseSensitive: false)
+            .firstMatch(contentType);
     if (boundaryMatch != null) {
       boundary = boundaryMatch.group(1) ?? boundaryMatch.group(2)?.trim();
     }
@@ -329,7 +341,8 @@ class DicomWebClient {
       final boundaryBytes = '--$boundary'.codeUnits;
       int idx = _indexOfSublist(bytes, boundaryBytes);
       if (idx != -1) {
-        final payload = _stripHeaders(bytes.sublist(idx + boundaryBytes.length));
+        final payload =
+            _stripHeaders(bytes.sublist(idx + boundaryBytes.length));
         int endIdx = _indexOfSublist(payload, boundaryBytes);
         if (endIdx != -1) {
           return payload.sublist(0, endIdx);
@@ -351,7 +364,8 @@ class DicomWebClient {
     if (bytes[0] != 45 || bytes[1] != 45) return false; // Must start with '--'
     for (int i = 2; i < math.min(bytes.length, 64); i++) {
       if (bytes[i] == 10 || bytes[i] == 13) return true;
-      if (bytes[i] < 32 && bytes[i] != 9) return false; // Binary non-text byte found
+      if (bytes[i] < 32 && bytes[i] != 9)
+        return false; // Binary non-text byte found
     }
     return false;
   }
@@ -377,9 +391,11 @@ class DicomWebClient {
     final searchStart = math.max(0, body.length - 256);
     int lastBoundary = -1;
     for (int i = body.length - 2; i >= searchStart; i--) {
-      if (body[i] == 45 && body[i + 1] == 45) { // '--'
+      if (body[i] == 45 && body[i + 1] == 45) {
+        // '--'
         if (i > 0 && (body[i - 1] == 10 || body[i - 1] == 13)) {
-          lastBoundary = i - (body[i - 1] == 10 && i > 1 && body[i - 2] == 13 ? 2 : 1);
+          lastBoundary =
+              i - (body[i - 1] == 10 && i > 1 && body[i - 2] == 13 ? 2 : 1);
           break;
         }
       }
