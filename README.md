@@ -120,12 +120,14 @@ To minimize regulatory friction for downstream medical device integrators seekin
 
 ---
 
-## Medical & Diagnostic Disclaimer
+## Medical & Diagnostic Disclaimer & Integrator Responsibility
 
 > [!CAUTION]
-> **NOT CERTIFIED FOR PRIMARY DIAGNOSTIC USE**
+> **REUSABLE COMPONENT / NOT CERTIFIED FOR PRIMARY DIAGNOSTIC USE**
 > 
-> This software is provided for educational, research, software integration, or informational purposes only. It is **NOT** certified as a medical device and is **NOT** intended for primary diagnostic use, patient diagnosis, or clinical decision-making unless explicitly validated by the end user / integrator in accordance with applicable medical device regulatory standards (e.g., FDA 510(k), CE Mark under EU MDR, or local regulatory authorities).
+> This software is provided as a software component / library for educational, research, evaluation, and software integration purposes only. It is **NOT** an independently certified or cleared medical device and is **NOT** intended for primary diagnostic use, patient diagnosis, or clinical decision-making.
+> 
+> Any developer, OEM, or organization incorporating this library into a clinical application, diagnostic workstation, or Software as a Medical Device (SaMD) assumes full responsibility as the **Medical Device Manufacturer** to perform complete Software Verification and Validation (V&V), Clinical Evaluation, Usability Engineering (IEC 62366-1), and Risk Management (ISO 14971) in accordance with applicable medical device regulatory standards (e.g., FDA 21 CFR 820 / 510(k), CE Mark under EU MDR 2017/745, PMDA, or local regulatory authorities) prior to clinical deployment.
 
 ---
 
