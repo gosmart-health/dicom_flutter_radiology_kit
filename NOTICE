@@ -1,7 +1,13 @@
 dicom_flutter_radiology_kit
 Copyright 2026 Manabu Tokunaga
 
-NOTICE: This software is for educational, research, or informational purposes only. 
-It is NOT certified as a medical device and is NOT intended for primary diagnostic use 
-or clinical decision-making unless validated by the user in accordance with applicable 
-medical device regulations (e.g., FDA 510(k), CE Mark, or local regulatory authorities).
+NOTICE: This software library is provided for educational, research, evaluation, 
+and software integration purposes only. It is NOT independently certified or cleared 
+as a medical device.
+
+Any developer, OEM, or organization that incorporates this software into a clinical 
+product, diagnostic system, or Software as a Medical Device (SaMD) assumes full responsibility 
+as the Medical Device Manufacturer to perform all required Software Verification and Validation 
+(V&V), Clinical Evaluation, Usability Engineering (IEC 62366-1), and Risk Management (ISO 14971) 
+in accordance with applicable medical device regulations (e.g., FDA 510(k)/De Novo, CE Mark 
+under EU MDR 2017/745, PMDA, or local regulatory authorities) prior to clinical deployment.
