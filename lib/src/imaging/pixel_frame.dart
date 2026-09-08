@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'pixel_spacing.dart';
 
 /// Core container for a single DICOM frame preserving 16-bit scalar pixel buffers.
 class PixelFrame {
@@ -29,6 +30,9 @@ class PixelFrame {
   /// Pixel representation (0 = unsigned, 1 = signed).
   final bool isSigned;
 
+  /// Physical spacing between pixel centers in mm (DICOM 0028,0030).
+  final PixelSpacing? pixelSpacing;
+
   PixelFrame({
     required this.rawPixels,
     required this.width,
@@ -39,6 +43,7 @@ class PixelFrame {
     this.bitsStored = 12,
     this.bitsAllocated = 16,
     this.isSigned = false,
+    this.pixelSpacing,
   });
 
   /// Total number of pixels in frame.

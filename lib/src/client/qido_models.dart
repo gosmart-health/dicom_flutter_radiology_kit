@@ -1,3 +1,5 @@
+import '../imaging/pixel_spacing.dart';
+
 /// Data models and DICOM JSON parsing utilities for DICOMweb QIDO-RS and WADO-RS.
 
 /// Helper to parse DICOM JSON (Part 18 Standard Model) tag dictionaries.
@@ -121,6 +123,71 @@ class DicomJsonHelper {
     if (cleanTime.length >= 6) ss = cleanTime.substring(4, 6);
 
     return '${dateStr}T$hh:$mm:$ss';
+  }
+
+  /// Extracts [PixelSpacing] from DICOM JSON:
+  /// 1. (0028,0030) Pixel Spacing
+  /// 2. (0018,1164) Imager Pixel Spacing
+  /// 3. (5200,9229) Shared Functional Groups -> (0028,9110) Pixel Measures -> (0028,0030)
+  /// 4. (5200,9230) Per-Frame Functional Groups -> (0028,9110) Pixel Measures -> (0028,0030)
+  static PixelSpacing? getPixelSpacing(Map<String, dynamic>? json) {
+    if (json == null) return null;
+
+    PixelSpacing? extractFromTag(dynamic tagEntry) {
+      if (tagEntry == null) return null;
+      if (tagEntry is Map<String, dynamic>) {
+        final val = tagEntry['Value'];
+        final parsed = PixelSpacing.tryParse(val);
+        if (parsed != null) return parsed;
+      }
+      return PixelSpacing.tryParse(tagEntry);
+    }
+
+    // 1. Direct (0028,0030) Pixel Spacing
+    final ps = extractFromTag(json['00280030'] ?? json['0028,0030']);
+    if (ps != null) return ps;
+
+    // 2. Direct (0018,1164) Imager Pixel Spacing
+    final ips = extractFromTag(json['00181164'] ?? json['0018,1164']);
+    if (ips != null) return ips;
+
+    // 3. Shared Functional Groups Sequence (5200,9229) -> Pixel Measures Sequence (0028,9110)
+    final sharedSeq = json['52009229'] ?? json['5200,9229'];
+    if (sharedSeq is Map<String, dynamic>) {
+      final val = sharedSeq['Value'];
+      if (val is List && val.isNotEmpty && val.first is Map<String, dynamic>) {
+        final item = val.first as Map<String, dynamic>;
+        final pixelMeasures = item['00289110'] ?? item['0028,9110'];
+        if (pixelMeasures is Map<String, dynamic>) {
+          final pmVal = pixelMeasures['Value'];
+          if (pmVal is List && pmVal.isNotEmpty && pmVal.first is Map<String, dynamic>) {
+            final pmItem = pmVal.first as Map<String, dynamic>;
+            final pmPs = extractFromTag(pmItem['00280030'] ?? pmItem['0028,0030']);
+            if (pmPs != null) return pmPs;
+          }
+        }
+      }
+    }
+
+    // 4. Per-Frame Functional Groups Sequence (5200,9230) -> Pixel Measures Sequence (0028,9110)
+    final perFrameSeq = json['52009230'] ?? json['5200,9230'];
+    if (perFrameSeq is Map<String, dynamic>) {
+      final val = perFrameSeq['Value'];
+      if (val is List && val.isNotEmpty && val.first is Map<String, dynamic>) {
+        final item = val.first as Map<String, dynamic>;
+        final pixelMeasures = item['00289110'] ?? item['0028,9110'];
+        if (pixelMeasures is Map<String, dynamic>) {
+          final pmVal = pixelMeasures['Value'];
+          if (pmVal is List && pmVal.isNotEmpty && pmVal.first is Map<String, dynamic>) {
+            final pmItem = pmVal.first as Map<String, dynamic>;
+            final pmPs = extractFromTag(pmItem['00280030'] ?? pmItem['0028,0030']);
+            if (pmPs != null) return pmPs;
+          }
+        }
+      }
+    }
+
+    return null;
   }
 }
 
@@ -268,6 +335,7 @@ class DicomInstanceSummary {
   final double? windowWidth;
   final String photometricInterpretation;
   final String? transferSyntaxUID;
+  final PixelSpacing? pixelSpacing;
   final Map<String, dynamic> rawJson;
 
   const DicomInstanceSummary({
@@ -286,8 +354,50 @@ class DicomInstanceSummary {
     this.windowWidth,
     required this.photometricInterpretation,
     this.transferSyntaxUID,
+    this.pixelSpacing,
     required this.rawJson,
   });
+
+  DicomInstanceSummary copyWith({
+    String? sopInstanceUID,
+    String? sopClassUID,
+    int? instanceNumber,
+    int? rows,
+    int? columns,
+    int? bitsAllocated,
+    int? bitsStored,
+    int? highBit,
+    bool? isSigned,
+    double? rescaleSlope,
+    double? rescaleIntercept,
+    double? windowCenter,
+    double? windowWidth,
+    String? photometricInterpretation,
+    String? transferSyntaxUID,
+    PixelSpacing? pixelSpacing,
+    Map<String, dynamic>? rawJson,
+  }) {
+    return DicomInstanceSummary(
+      sopInstanceUID: sopInstanceUID ?? this.sopInstanceUID,
+      sopClassUID: sopClassUID ?? this.sopClassUID,
+      instanceNumber: instanceNumber ?? this.instanceNumber,
+      rows: rows ?? this.rows,
+      columns: columns ?? this.columns,
+      bitsAllocated: bitsAllocated ?? this.bitsAllocated,
+      bitsStored: bitsStored ?? this.bitsStored,
+      highBit: highBit ?? this.highBit,
+      isSigned: isSigned ?? this.isSigned,
+      rescaleSlope: rescaleSlope ?? this.rescaleSlope,
+      rescaleIntercept: rescaleIntercept ?? this.rescaleIntercept,
+      windowCenter: windowCenter ?? this.windowCenter,
+      windowWidth: windowWidth ?? this.windowWidth,
+      photometricInterpretation:
+          photometricInterpretation ?? this.photometricInterpretation,
+      transferSyntaxUID: transferSyntaxUID ?? this.transferSyntaxUID,
+      pixelSpacing: pixelSpacing ?? this.pixelSpacing,
+      rawJson: rawJson ?? this.rawJson,
+    );
+  }
 
   factory DicomInstanceSummary.fromJson(Map<String, dynamic> json) {
     final sopInstanceUID = DicomJsonHelper.getString(json, '00080018') ?? '';
@@ -308,6 +418,7 @@ class DicomInstanceSummary {
     final photometricInterpretation =
         DicomJsonHelper.getString(json, '00280004') ?? 'MONOCHROME2';
     final transferSyntaxUID = DicomJsonHelper.getString(json, '00020010');
+    final pixelSpacing = DicomJsonHelper.getPixelSpacing(json);
 
     return DicomInstanceSummary(
       sopInstanceUID: sopInstanceUID,
@@ -325,6 +436,7 @@ class DicomInstanceSummary {
       windowWidth: windowWidth,
       photometricInterpretation: photometricInterpretation,
       transferSyntaxUID: transferSyntaxUID,
+      pixelSpacing: pixelSpacing,
       rawJson: json,
     );
   }

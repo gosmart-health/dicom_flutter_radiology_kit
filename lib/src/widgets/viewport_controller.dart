@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../imaging/pixel_frame.dart';
+import '../imaging/pixel_spacing.dart';
 import '../imaging/presentation_state.dart';
 import '../imaging/window_presets.dart';
 
@@ -12,6 +13,7 @@ class ViewportController extends ChangeNotifier {
   double _zoom = 1.0;
   Offset _panOffset = Offset.zero;
   WindowPreset? _activePreset = WindowPresets.softTissue;
+  PixelSpacing? _pixelSpacing;
   String _patientName = '';
   String _patientId = '';
   String _studyDescription = '';
@@ -26,6 +28,13 @@ class ViewportController extends ChangeNotifier {
   double get zoom => _zoom;
   Offset get panOffset => _panOffset;
   WindowPreset? get activePreset => _activePreset;
+  PixelSpacing? get pixelSpacing => _pixelSpacing ?? _currentFrame?.pixelSpacing;
+
+  /// Sets or overrides the active pixel spacing (DICOM 0028,0030).
+  void setPixelSpacing(PixelSpacing? spacing) {
+    _pixelSpacing = spacing;
+    notifyListeners();
+  }
 
   String get patientName => _patientName;
   String get patientId => _patientId;
@@ -124,6 +133,7 @@ class ViewportController extends ChangeNotifier {
   /// Clears active pixel frame and patient metadata from memory.
   void clear() {
     _currentFrame = null;
+    _pixelSpacing = null;
     _patientName = '';
     _patientId = '';
     _studyDescription = '';
@@ -196,6 +206,7 @@ class ViewportController extends ChangeNotifier {
     String? seriesDescription,
     int? frameIndex,
     int? totalFrames,
+    PixelSpacing? pixelSpacing,
   }) {
     if (patientName != null) _patientName = patientName;
     if (patientId != null) _patientId = patientId;
@@ -203,6 +214,7 @@ class ViewportController extends ChangeNotifier {
     if (seriesDescription != null) _seriesDescription = seriesDescription;
     if (frameIndex != null) _frameIndex = frameIndex;
     if (totalFrames != null) _totalFrames = totalFrames;
+    if (pixelSpacing != null) _pixelSpacing = pixelSpacing;
     notifyListeners();
   }
 

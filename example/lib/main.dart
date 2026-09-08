@@ -78,12 +78,80 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   // In-memory persistent presentation states per frame index
   final Map<int, DicomPresentationState> _framePresentationCache = {};
 
+  // Annotation controllers pool for up to 9 slots
+  late final List<AnnotationController> _annotationControllers;
+  AnnotationTool _activeTool = AnnotationTool.none;
+  String? _collaboratorFilter;
+
+  // Cache of annotations per study/series key and frame index:
+  // Map<seriesKey, Map<frameIndex, List<DicomAnnotation>>>
+  final Map<String, Map<int, List<DicomAnnotation>>> _seriesAnnotationCache = {};
+  String? _activeSeriesKey;
+  final List<int?> _slotActiveFrameIndex = List.filled(9, null);
+
+  String _computeSeriesKey() {
+    if (_loadedSeries != null) {
+      final studyUid = _loadedSeries!.study?.studyInstanceUID ?? 'unknown_study';
+      final seriesUid = _loadedSeries!.series.seriesInstanceUID;
+      return '$studyUid/$seriesUid';
+    }
+    return 'fixture:$_selectedFixture';
+  }
+
+  void _saveCurrentSlotAnnotations() {
+    if (_activeSeriesKey == null) return;
+    final cache = _seriesAnnotationCache.putIfAbsent(_activeSeriesKey!, () => {});
+    for (int s = 0; s < 9; s++) {
+      final frameIdx = _slotActiveFrameIndex[s];
+      if (frameIdx != null) {
+        cache[frameIdx] =
+            List<DicomAnnotation>.from(_annotationControllers[s].allAnnotations);
+      }
+    }
+  }
+
+  void _restoreSlotAnnotations(String newSeriesKey) {
+    _saveCurrentSlotAnnotations();
+    _activeSeriesKey = newSeriesKey;
+    final cache = _seriesAnnotationCache[newSeriesKey] ?? {};
+    final activeSlots = _layout.count;
+    final totalFrames = _loadedSeries?.frameCount ?? 1;
+
+    for (int s = 0; s < 9; s++) {
+      if (s < activeSlots &&
+          (_loadedSeries != null
+              ? (_currentFrameIndex + s < totalFrames)
+              : s == 0)) {
+        final frameIdx = _loadedSeries != null ? (_currentFrameIndex + s) : 0;
+        _slotActiveFrameIndex[s] = frameIdx;
+        final saved = cache[frameIdx] ?? const <DicomAnnotation>[];
+        _annotationControllers[s].setAnnotations(saved);
+        _annotationControllers[s].setActiveTool(_activeTool);
+        _annotationControllers[s].setFilterCreator(_collaboratorFilter);
+      } else {
+        _slotActiveFrameIndex[s] = null;
+        _annotationControllers[s].setAnnotations(const <DicomAnnotation>[]);
+        _annotationControllers[s].setActiveTool(_activeTool);
+        _annotationControllers[s].setFilterCreator(_collaboratorFilter);
+      }
+    }
+  }
+
   ViewportController get _primaryController => _controllers[0];
+  AnnotationController get _primaryAnnotationController =>
+      _annotationControllers[0];
 
   @override
   void initState() {
     super.initState();
     _activeServerUrl = DicomServerUrlStore.getLastUsedUrl();
+
+    _annotationControllers = List.generate(9, (index) {
+      return AnnotationController(
+        initialTool: _activeTool,
+        activeCreator: 'Dr. Radiologist',
+      );
+    });
 
     _controllers = List.generate(9, (index) {
       final controller = ViewportController();
@@ -117,10 +185,14 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     for (final c in _controllers) {
       c.dispose();
     }
+    for (final ac in _annotationControllers) {
+      ac.dispose();
+    }
     super.dispose();
   }
 
   void _loadCtPhantom() {
+    _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
@@ -147,9 +219,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       _currentFrameIndex = 0;
       _selectedFixture = 'CT Phantom';
     });
+    _restoreSlotAnnotations('fixture:CT Phantom');
   }
 
   void _loadTg18Qc() {
+    _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
@@ -176,9 +250,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       _currentFrameIndex = 0;
       _selectedFixture = 'TG18-QC Test Pattern';
     });
+    _restoreSlotAnnotations('fixture:TG18-QC Test Pattern');
   }
 
   void _loadDynamicRamp() {
+    _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
@@ -205,17 +281,22 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       _currentFrameIndex = 0;
       _selectedFixture = 'Dynamic Ramp';
     });
+    _restoreSlotAnnotations('fixture:Dynamic Ramp');
   }
 
   Future<void> _openQidoBrowser() async {
     await QidoBrowserDialog.show(
       context,
       onStudySelected: (study) {
+        _saveCurrentSlotAnnotations();
         _loadedSeries?.dispose();
         _loadedSeries = null;
         _framePresentationCache.clear();
         for (final c in _controllers) {
           c.clear();
+        }
+        for (final ac in _annotationControllers) {
+          ac.setAnnotations(const []);
         }
         setState(() {
           _currentFrameIndex = 0;
@@ -223,6 +304,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         });
       },
       onSeriesLoaded: (seriesBuffer, initialFrame) {
+        _saveCurrentSlotAnnotations();
         _loadedSeries?.dispose();
         _framePresentationCache.clear();
         setState(() {
@@ -232,6 +314,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         });
 
         _syncGridLayoutFrames();
+        _restoreSlotAnnotations(_computeSeriesKey());
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -249,6 +332,137 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         _activeServerUrl = DicomServerUrlStore.getLastUsedUrl();
       });
     }
+  }
+
+  void _setAnnotationTool(AnnotationTool tool) {
+    setState(() {
+      _activeTool = tool;
+    });
+    for (final c in _annotationControllers) {
+      c.setActiveTool(tool);
+    }
+  }
+
+  void _setCollaboratorFilter(String? creator) {
+    setState(() {
+      _collaboratorFilter = creator;
+    });
+    for (final c in _annotationControllers) {
+      c.setFilterCreator(creator);
+    }
+  }
+
+  void _loadSampleAnnotations() {
+    _primaryAnnotationController.clearAnnotations();
+
+    // 1. Caliper across thorax
+    final caliper = CaliperAnnotation(
+      id: 'cal_thorax',
+      start: const Offset(140, 256),
+      end: const Offset(372, 256),
+      label: 'Thoracic width',
+      creatorName: 'Dr. Alice',
+    );
+
+    // 2. 3-point Angle at subcarina
+    final angle = AngleAnnotation(
+      id: 'ang_carina',
+      p1: const Offset(210, 200),
+      vertex: const Offset(256, 235),
+      p2: const Offset(302, 200),
+      label: 'Carinal angle',
+      creatorName: 'Dr. Alice',
+    );
+
+    // 3. Circle around hyperdense nodule
+    final circle = CircleAnnotation(
+      id: 'circ_nodule',
+      center: const Offset(332, 195),
+      radius: 18.0,
+      label: 'Hyperdense nodule',
+      creatorName: 'Dr. Bob',
+    );
+
+    // 4. Ellipse around vertebra / spine
+    final ellipse = EllipseAnnotation(
+      id: 'ell_spine',
+      center: const Offset(256, 360),
+      radiusX: 28.0,
+      radiusY: 18.0,
+      rotation: 0.0,
+      label: 'Vertebral body',
+      creatorName: 'Dr. Alice',
+    );
+
+    // 5. Text annotation note
+    final text = TextAnnotation(
+      id: 'txt_finding',
+      anchor: const Offset(340, 160),
+      text: 'Suspicious nodule (180 HU)',
+      creatorName: 'Dr. Bob',
+    );
+
+    _primaryAnnotationController.addAnnotation(caliper);
+    _primaryAnnotationController.addAnnotation(angle);
+    _primaryAnnotationController.addAnnotation(circle);
+    _primaryAnnotationController.addAnnotation(ellipse);
+    _primaryAnnotationController.addAnnotation(text);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Loaded clinical sample annotations (Dr. Alice & Dr. Bob).',
+        ),
+        backgroundColor: Color(0xFF238636),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _openGspsModal() {
+    _saveCurrentSlotAnnotations();
+    final gsps = _primaryAnnotationController.toGspsPresentationState(
+      contentLabel: 'WORKBENCH_EXPORT',
+      contentDescription: 'Clinical review marks',
+    );
+    final jsonString = gsps.toJsonString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF161B22),
+        title: const Row(
+          children: [
+            Icon(Icons.code, color: Color(0xFF58A6FF), size: 20),
+            SizedBox(width: 8),
+            Text(
+              'DICOM GSPS Presentation State JSON',
+              style: TextStyle(fontSize: 15, color: Colors.white),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 600,
+          height: 400,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              jsonString,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: Color(0xFF7EE787),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Map<String, dynamic> _getActiveSliceMetadata() {
@@ -393,6 +607,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     if (_loadedSeries == null || _isLoadingFrame) return;
     if (index < 0 || index >= _loadedSeries!.frameCount) return;
 
+    _saveCurrentSlotAnnotations();
     setState(() {
       _isLoadingFrame = true;
       _currentFrameIndex = index;
@@ -400,6 +615,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
     try {
       await _syncGridLayoutFrames();
+      _restoreSlotAnnotations(_computeSeriesKey());
     } finally {
       if (mounted) {
         setState(() => _isLoadingFrame = false);
@@ -473,6 +689,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               seriesDescription: _loadedSeries!.series.seriesDescription,
               frameIndex: frameIdx + 1,
               totalFrames: totalCount,
+              pixelSpacing: pixelFrame.pixelSpacing,
             );
           }
         } else {
@@ -485,10 +702,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   }
 
   void _setLayout(ViewportLayout layout) {
+    _saveCurrentSlotAnnotations();
     setState(() {
       _layout = layout;
     });
     _syncGridLayoutFrames();
+    _restoreSlotAnnotations(_computeSeriesKey());
   }
 
   @override
@@ -596,7 +815,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         children: [
           // Main Viewport Area: 1, 2, 4, or 9 on 1 Grid
           Expanded(
-            child: _buildViewportGrid(),
+            child: Column(
+              children: [
+                _buildAnnotationToolbar(),
+                Expanded(child: _buildViewportGrid()),
+              ],
+            ),
           ),
 
           // Control & Inspector Sidebar
@@ -610,6 +834,247 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               child: _buildSidebar(),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAnnotationToolbar() {
+    return ListenableBuilder(
+      listenable: _primaryAnnotationController,
+      builder: (context, _) {
+        final currentTool = _primaryAnnotationController.activeTool;
+        final canUndo = _primaryAnnotationController.canUndo;
+        final canRedo = _primaryAnnotationController.canRedo;
+        final hasSelected =
+            _primaryAnnotationController.selectedAnnotation != null;
+        final canDelete = _primaryAnnotationController.hasDeletable;
+
+        return Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFF161B22),
+            border: Border(
+              bottom: BorderSide(color: Color(0xFF30363D), width: 1.5),
+            ),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildToolButton(
+                  icon: Icons.open_with,
+                  label: 'Pan/W-L',
+                  tool: AnnotationTool.none,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.near_me_outlined,
+                  label: 'Select',
+                  tool: AnnotationTool.select,
+                  currentTool: currentTool,
+                ),
+                const SizedBox(width: 4),
+                const VerticalDivider(
+                    width: 16, indent: 8, endIndent: 8, color: Color(0xFF30363D)),
+                const SizedBox(width: 4),
+                _buildToolButton(
+                  icon: Icons.straighten,
+                  label: 'Caliper (mm)',
+                  tool: AnnotationTool.caliper,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.square_foot_rounded,
+                  label: 'Angle',
+                  tool: AnnotationTool.angle,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.timeline,
+                  label: 'Polyline',
+                  tool: AnnotationTool.polyline,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.circle_outlined,
+                  label: 'Circle',
+                  tool: AnnotationTool.circle,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.egg_outlined,
+                  label: 'Ellipse',
+                  tool: AnnotationTool.ellipse,
+                  currentTool: currentTool,
+                ),
+                _buildToolButton(
+                  icon: Icons.text_fields,
+                  label: 'Text',
+                  tool: AnnotationTool.text,
+                  currentTool: currentTool,
+                ),
+                const SizedBox(width: 4),
+                const VerticalDivider(
+                    width: 16, indent: 8, endIndent: 8, color: Color(0xFF30363D)),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.undo, size: 18),
+                  tooltip: 'Undo',
+                  color: canUndo ? Colors.white : const Color(0xFF484F58),
+                  onPressed: canUndo
+                      ? () => _primaryAnnotationController.undo()
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.redo, size: 18),
+                  tooltip: 'Redo',
+                  color: canRedo ? Colors.white : const Color(0xFF484F58),
+                  onPressed: canRedo
+                      ? () => _primaryAnnotationController.redo()
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  tooltip: hasSelected
+                      ? 'Delete Selected (Del)'
+                      : 'Delete Last Created (Del)',
+                  color: canDelete
+                      ? const Color(0xFFF85149)
+                      : const Color(0xFF484F58),
+                  onPressed: canDelete
+                      ? () => _primaryAnnotationController.deleteSelected()
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.clear_all, size: 18),
+                  tooltip: 'Clear All Annotations',
+                  color: _primaryAnnotationController.allAnnotations.isNotEmpty
+                      ? const Color(0xFF8B949E)
+                      : const Color(0xFF484F58),
+                  onPressed:
+                      _primaryAnnotationController.allAnnotations.isNotEmpty
+                          ? () => _primaryAnnotationController.clearAnnotations()
+                          : null,
+                ),
+                const SizedBox(width: 16),
+                _buildCollaboratorFilterDropdown(),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _loadSampleAnnotations,
+                  icon: const Icon(Icons.auto_awesome, size: 14),
+                  label: const Text('Samples', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFEB3B),
+                    side: const BorderSide(color: Color(0x66FFEB3B)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                ElevatedButton.icon(
+                  onPressed: _openGspsModal,
+                  icon: const Icon(Icons.download_for_offline_outlined, size: 14),
+                  label: const Text('GSPS JSON', style: TextStyle(fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF21262D),
+                    foregroundColor: const Color(0xFF58A6FF),
+                    side: const BorderSide(color: Color(0xFF30363D)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildToolButton({
+    required IconData icon,
+    required String label,
+    required AnnotationTool tool,
+    required AnnotationTool currentTool,
+  }) {
+    final isSelected = tool == currentTool;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(4),
+          onTap: () => _setAnnotationTool(tool),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF1F6FEB) : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color:
+                    isSelected ? const Color(0xFF58A6FF) : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isSelected ? Colors.white : const Color(0xFFC9D1D9),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? Colors.white : const Color(0xFFC9D1D9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollaboratorFilterDropdown() {
+    final collaborators = _primaryAnnotationController.collaborators.toList();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: _collaboratorFilter,
+          dropdownColor: const Color(0xFF161B22),
+          isDense: true,
+          hint: const Text('All Collaborators',
+              style: TextStyle(fontSize: 11, color: Color(0xFF58A6FF))),
+          icon: const Icon(Icons.arrow_drop_down,
+              size: 16, color: Color(0xFF58A6FF)),
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('All Collaborators',
+                  style: TextStyle(fontSize: 11, color: Colors.white)),
+            ),
+            for (final creator in collaborators)
+              DropdownMenuItem<String?>(
+                value: creator,
+                child: Text('User: $creator',
+                    style: const TextStyle(fontSize: 11, color: Colors.white)),
+              ),
+          ],
+          onChanged: (val) => _setCollaboratorFilter(val),
+        ),
       ),
     );
   }
@@ -643,31 +1108,37 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     );
   }
 
+  Widget _buildViewportSlot(int slot) {
+    return ClipRect(
+      clipBehavior: Clip.hardEdge,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DicomViewport(
+            controller: _controllers[slot],
+            showOverlay: _showOverlay,
+          ),
+          DicomAnnotationLayer(
+            viewportController: _controllers[slot],
+            annotationController: _annotationControllers[slot],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildViewportGrid() {
     switch (_layout) {
       case ViewportLayout.oneOnOne:
-        return DicomViewport(
-          controller: _controllers[0],
-          showOverlay: _showOverlay,
-        );
+        return _buildViewportSlot(0);
 
       case ViewportLayout.twoOnOne:
         return Row(
           children: [
-            Expanded(
-              child: DicomViewport(
-                controller: _controllers[0],
-                showOverlay: _showOverlay,
-              ),
-            ),
+            Expanded(child: _buildViewportSlot(0)),
             const VerticalDivider(
                 width: 2, thickness: 2, color: Color(0xFF30363D)),
-            Expanded(
-              child: DicomViewport(
-                controller: _controllers[1],
-                showOverlay: _showOverlay,
-              ),
-            ),
+            Expanded(child: _buildViewportSlot(1)),
           ],
         );
 
@@ -677,20 +1148,10 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             Expanded(
               child: Row(
                 children: [
-                  Expanded(
-                    child: DicomViewport(
-                      controller: _controllers[0],
-                      showOverlay: _showOverlay,
-                    ),
-                  ),
+                  Expanded(child: _buildViewportSlot(0)),
                   const VerticalDivider(
                       width: 2, thickness: 2, color: Color(0xFF30363D)),
-                  Expanded(
-                    child: DicomViewport(
-                      controller: _controllers[1],
-                      showOverlay: _showOverlay,
-                    ),
-                  ),
+                  Expanded(child: _buildViewportSlot(1)),
                 ],
               ),
             ),
@@ -698,20 +1159,10 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             Expanded(
               child: Row(
                 children: [
-                  Expanded(
-                    child: DicomViewport(
-                      controller: _controllers[2],
-                      showOverlay: _showOverlay,
-                    ),
-                  ),
+                  Expanded(child: _buildViewportSlot(2)),
                   const VerticalDivider(
                       width: 2, thickness: 2, color: Color(0xFF30363D)),
-                  Expanded(
-                    child: DicomViewport(
-                      controller: _controllers[3],
-                      showOverlay: _showOverlay,
-                    ),
-                  ),
+                  Expanded(child: _buildViewportSlot(3)),
                 ],
               ),
             ),
@@ -739,12 +1190,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                                     width: 2,
                                     thickness: 2,
                                     color: Color(0xFF30363D)),
-                              Expanded(
-                                child: DicomViewport(
-                                  controller: _controllers[slot],
-                                  showOverlay: _showOverlay,
-                                ),
-                              ),
+                              Expanded(child: _buildViewportSlot(slot)),
                             ],
                           ),
                         );
@@ -761,7 +1207,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
   Widget _buildSidebar() {
     return ListenableBuilder(
-      listenable: _primaryController,
+      listenable:
+          Listenable.merge([_primaryController, _primaryAnnotationController]),
       builder: (context, _) {
         final frame = _primaryController.currentFrame;
         return ListView(
@@ -982,6 +1429,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
             const Divider(height: 32, color: Color(0xFF30363D)),
 
+            // Annotations & GSPS Section
+            _buildSectionHeader('ANNOTATIONS & GSPS STATE'),
+            _buildAnnotationsSidebarSection(),
+
+            const Divider(height: 32, color: Color(0xFF30363D)),
+
             // DICOM Frame Metadata
             _buildSectionHeader('PRIMARY FRAME METADATA'),
             if (frame != null) ...[
@@ -1000,6 +1453,136 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         );
       },
     );
+  }
+
+  Widget _buildAnnotationsSidebarSection() {
+    final annotations = _primaryAnnotationController.visibleAnnotations;
+    final selected = _primaryAnnotationController.selectedAnnotation;
+
+    if (annotations.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF21262D),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFF30363D)),
+        ),
+        child: const Column(
+          children: [
+            Text(
+              'No annotations on current slice.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF8B949E)),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Use Caliper, Angle, Circle, Ellipse, or Text on the toolbar to draw.',
+              style: TextStyle(fontSize: 10, color: Color(0xFF484F58)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF21262D),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF30363D)),
+      ),
+      child: Column(
+        children: [
+          for (final ann in annotations) ...[
+            ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+              selected: selected?.id == ann.id,
+              selectedTileColor: const Color(0xFF1F6FEB).withValues(alpha: 0.2),
+              leading: Icon(
+                _getAnnotationIcon(ann),
+                size: 16,
+                color: const Color(0xFFFFEB3B),
+              ),
+              title: Text(
+                _getAnnotationTitle(ann),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              subtitle: Text(
+                'By ${ann.creatorName ?? "Anonymous"} • ${ann.type.name.toUpperCase()}',
+                style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
+              ),
+              trailing: IconButton(
+                icon:
+                    const Icon(Icons.close, size: 14, color: Color(0xFF8B949E)),
+                tooltip: 'Delete',
+                onPressed: () =>
+                    _primaryAnnotationController.removeAnnotation(ann.id),
+              ),
+              onTap: () => _primaryAnnotationController.selectAnnotation(ann),
+            ),
+            const Divider(height: 1, thickness: 1, color: Color(0xFF30363D)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _getAnnotationIcon(DicomAnnotation ann) {
+    switch (ann.type) {
+      case AnnotationType.caliper:
+        return Icons.straighten;
+      case AnnotationType.angle:
+        return Icons.square_foot_rounded;
+      case AnnotationType.polyline:
+        return Icons.timeline;
+      case AnnotationType.circle:
+        return Icons.circle_outlined;
+      case AnnotationType.ellipse:
+        return Icons.egg_outlined;
+      case AnnotationType.text:
+        return Icons.text_fields;
+    }
+  }
+
+  String _getAnnotationTitle(DicomAnnotation ann) {
+    if (ann is CaliperAnnotation) {
+      final val =
+          ann.formatDistance(pixelSpacing: _primaryController.pixelSpacing);
+      return ann.label != null && ann.label!.isNotEmpty
+          ? '${ann.label}: $val'
+          : 'Distance: $val';
+    } else if (ann is AngleAnnotation) {
+      final val = ann.formatAngle();
+      return ann.label != null && ann.label!.isNotEmpty
+          ? '${ann.label}: $val'
+          : 'Angle: $val';
+    } else if (ann is CircleAnnotation) {
+      final area = ann.formatArea(pixelSpacing: _primaryController.pixelSpacing);
+      return ann.label != null && ann.label!.isNotEmpty
+          ? '${ann.label}: $area'
+          : 'Circle ($area)';
+    } else if (ann is EllipseAnnotation) {
+      final area = ann.formatArea(pixelSpacing: _primaryController.pixelSpacing);
+      return ann.label != null && ann.label!.isNotEmpty
+          ? '${ann.label}: $area'
+          : 'Ellipse ($area)';
+    } else if (ann is PolylineAnnotation) {
+      if (ann.isClosedOrClosureDetected) {
+        final area = ann.formatArea(pixelSpacing: _primaryController.pixelSpacing);
+        return ann.label != null && ann.label!.isNotEmpty
+            ? '${ann.label}: $area'
+            : 'Polygon ($area)';
+      }
+      return ann.label ?? 'Polyline (${ann.points.length} pts)';
+    } else if (ann is TextAnnotation) {
+      return '"${ann.text}"';
+    }
+    return ann.label ?? ann.type.name;
   }
 
   Widget _buildSectionHeader(String title) {

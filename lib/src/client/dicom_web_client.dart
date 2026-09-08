@@ -239,23 +239,8 @@ class DicomWebClient {
         compressionMode: compressionMode,
       );
 
-      final updatedMetadata = DicomInstanceSummary(
-        sopInstanceUID: inst.sopInstanceUID,
-        sopClassUID: inst.sopClassUID,
-        instanceNumber: inst.instanceNumber,
-        rows: inst.rows,
-        columns: inst.columns,
-        bitsAllocated: inst.bitsAllocated,
-        bitsStored: inst.bitsStored,
-        highBit: inst.highBit,
-        isSigned: inst.isSigned,
-        rescaleSlope: inst.rescaleSlope,
-        rescaleIntercept: inst.rescaleIntercept,
-        windowCenter: inst.windowCenter,
-        windowWidth: inst.windowWidth,
-        photometricInterpretation: inst.photometricInterpretation,
+      final updatedMetadata = inst.copyWith(
         transferSyntaxUID: effectiveTransferSyntax,
-        rawJson: inst.rawJson,
       );
 
       final frameBuffer = DicomFrameBuffer(

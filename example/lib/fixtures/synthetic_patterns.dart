@@ -109,6 +109,7 @@ class SyntheticPatterns {
       bitsStored: 12,
       bitsAllocated: 16,
       isSigned: true,
+      pixelSpacing: const PixelSpacing(rowSpacing: 0.625, columnSpacing: 0.625),
     );
   }
 

@@ -41,6 +41,8 @@ class ViewportOverlays extends StatelessWidget {
                     controller.seriesDescription,
                   if (controller.currentFrame != null)
                     'Dim: ${controller.currentFrame!.width}x${controller.currentFrame!.height}',
+                  if (controller.pixelSpacing != null)
+                    'Pixel: ${controller.pixelSpacing!.columnSpacing.toStringAsFixed(3)} x ${controller.pixelSpacing!.rowSpacing.toStringAsFixed(3)} mm',
                 ], crossAxisAlignment: CrossAxisAlignment.end),
               ),
 
