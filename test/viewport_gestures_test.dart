@@ -51,7 +51,8 @@ void main() {
   });
 
   group('Desktop Mouse Gestures (general industrial PACS conventions)', () {
-    testWidgets('Left mouse click drag adjusts Window/Level', (WidgetTester tester) async {
+    testWidgets('Left mouse click drag adjusts Window/Level',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setWindowLevel(100.0, 500.0);
 
@@ -73,7 +74,8 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // Drag right (+20 dx) and up (-30 dy)
-      final gesture = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
+      final gesture = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
       await gesture.moveBy(const Offset(20, -30));
       await tester.pump();
       await gesture.up();
@@ -85,7 +87,8 @@ void main() {
       expect(controller.windowCenter, equals(40.0));
     });
 
-    testWidgets('Right mouse click drag zooms in and out', (WidgetTester tester) async {
+    testWidgets('Right mouse click drag zooms in and out',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setZoom(1.0);
 
@@ -107,7 +110,8 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // Secondary (Right) mouse drag UP (-50 dy) -> Zoom in
-      final gesture = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
+      final gesture = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kSecondaryMouseButton);
       await gesture.moveBy(const Offset(0, -50));
       await tester.pump();
       await gesture.up();
@@ -117,7 +121,8 @@ void main() {
       expect(controller.zoom, equals(1.5));
     });
 
-    testWidgets('Shift + Left mouse click drag zooms in and out', (WidgetTester tester) async {
+    testWidgets('Shift + Left mouse click drag zooms in and out',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setZoom(1.0);
 
@@ -142,7 +147,8 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
 
       // Primary (Left) mouse drag UP (-40 dy) with Shift held
-      final gesture = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
+      final gesture = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
       await gesture.moveBy(const Offset(0, -40));
       await tester.pump();
       await gesture.up();
@@ -176,7 +182,8 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // Middle button drag (+15 dx, +25 dy)
-      final gesture = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kMiddleMouseButton);
+      final gesture = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kMiddleMouseButton);
       await gesture.moveBy(const Offset(15, 25));
       await tester.pump();
       await gesture.up();
@@ -185,7 +192,8 @@ void main() {
       expect(controller.panOffset, equals(const Offset(15, 25)));
     });
 
-    testWidgets('Ctrl + Left mouse drag pans canvas', (WidgetTester tester) async {
+    testWidgets('Ctrl + Left mouse drag pans canvas',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setPanOffset(Offset.zero);
 
@@ -209,7 +217,8 @@ void main() {
       // Simulate Ctrl key press
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
 
-      final gesture = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
+      final gesture = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
       await gesture.moveBy(const Offset(30, -10));
       await tester.pump();
       await gesture.up();
@@ -220,7 +229,8 @@ void main() {
       expect(controller.panOffset, equals(const Offset(30, -10)));
     });
 
-    testWidgets('Mouse wheel scroll triggers slice navigation', (WidgetTester tester) async {
+    testWidgets('Mouse wheel scroll triggers slice navigation',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       int? steppedDirection;
       controller.onSliceStep = (dir) => steppedDirection = dir;
@@ -259,7 +269,8 @@ void main() {
       expect(steppedDirection, equals(-1));
     });
 
-    testWidgets('Double click left button resets view', (WidgetTester tester) async {
+    testWidgets('Double click left button resets view',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setZoom(2.5);
       controller.setPanOffset(const Offset(50, 50));
@@ -282,12 +293,14 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // First click
-      final g1 = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
+      final g1 = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
       await g1.up();
       await tester.pump(const Duration(milliseconds: 50));
 
       // Second click within 300ms
-      final g2 = await tester.startGesture(center, kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
+      final g2 = await tester.startGesture(center,
+          kind: ui.PointerDeviceKind.mouse, buttons: kPrimaryMouseButton);
       await g2.up();
       await tester.pump();
 
@@ -297,7 +310,8 @@ void main() {
   });
 
   group('Mobile Touch Gestures (Apple HIG & clinical touch conventions)', () {
-    testWidgets('1-finger drag adjusts Window / Level', (WidgetTester tester) async {
+    testWidgets('1-finger drag adjusts Window / Level',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setWindowLevel(100.0, 500.0);
 
@@ -319,7 +333,8 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // 1-finger touch drag right (+15 dx) and down (+20 dy)
-      final touch = await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
+      final touch =
+          await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
       await touch.moveBy(const Offset(15, 20));
       await tester.pump();
       await touch.up();
@@ -331,7 +346,8 @@ void main() {
       expect(controller.windowCenter, equals(140.0));
     });
 
-    testWidgets('2-finger touch drag pans and pinches zoom', (WidgetTester tester) async {
+    testWidgets('2-finger touch drag pans and pinches zoom',
+        (WidgetTester tester) async {
       final controller = ViewportController();
       controller.setPanOffset(Offset.zero);
       controller.setZoom(1.0);
@@ -352,8 +368,10 @@ void main() {
       );
 
       // Start 2 fingers at (150, 200) and (250, 200) -> distance = 100, centroid = (200, 200)
-      final finger1 = await tester.startGesture(const Offset(150, 200), kind: ui.PointerDeviceKind.touch);
-      final finger2 = await tester.startGesture(const Offset(250, 200), kind: ui.PointerDeviceKind.touch);
+      final finger1 = await tester.startGesture(const Offset(150, 200),
+          kind: ui.PointerDeviceKind.touch);
+      final finger2 = await tester.startGesture(const Offset(250, 200),
+          kind: ui.PointerDeviceKind.touch);
       await tester.pump();
 
       // Move both fingers right by 20px, and spread finger2 further right by another 30px
@@ -395,12 +413,14 @@ void main() {
       final center = tester.getCenter(find.byType(ViewportGestureDetector));
 
       // Tap 1
-      final t1 = await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
+      final t1 =
+          await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
       await t1.up();
       await tester.pump(const Duration(milliseconds: 50));
 
       // Tap 2
-      final t2 = await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
+      final t2 =
+          await tester.startGesture(center, kind: ui.PointerDeviceKind.touch);
       await t2.up();
       await tester.pump();
 
@@ -430,7 +450,9 @@ void main() {
       expect(deserialized.presetName, equals('Abdomen'));
     });
 
-    test('ViewportController exports and restores presentation state with event hook', () {
+    test(
+        'ViewportController exports and restores presentation state with event hook',
+        () {
       final controller = ViewportController();
       DicomPresentationState? propagatedState;
       controller.onPresentationChanged = (s) => propagatedState = s;
@@ -454,7 +476,8 @@ void main() {
       expect(propagatedState, equals(newState));
     });
 
-    testWidgets('ViewportOverlays renders Img: frameIndex / totalFrames HUD indicator',
+    testWidgets(
+        'ViewportOverlays renders Img: frameIndex / totalFrames HUD indicator',
         (WidgetTester tester) async {
       final controller = ViewportController();
       controller.updateMetadata(

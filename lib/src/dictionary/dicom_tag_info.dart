@@ -64,6 +64,6 @@ class DicomTagInfo {
   }
 
   @override
-  String toString() => '$tag $name [$keyword] VR=$valueRepresentation VM=$valueMultiplicity';
+  String toString() =>
+      '$tag $name [$keyword] VR=$valueRepresentation VM=$valueMultiplicity';
 }
-

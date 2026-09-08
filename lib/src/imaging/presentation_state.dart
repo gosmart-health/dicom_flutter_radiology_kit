@@ -82,7 +82,8 @@ class DicomPresentationState {
   String toJsonString() => json.encode(toJson());
 
   factory DicomPresentationState.fromJsonString(String source) =>
-      DicomPresentationState.fromJson(json.decode(source) as Map<String, dynamic>);
+      DicomPresentationState.fromJson(
+          json.decode(source) as Map<String, dynamic>);
 
   @override
   bool operator ==(Object other) {
@@ -96,5 +97,6 @@ class DicomPresentationState {
   }
 
   @override
-  int get hashCode => Object.hash(windowCenter, windowWidth, zoom, panOffset, presetName);
+  int get hashCode =>
+      Object.hash(windowCenter, windowWidth, zoom, panOffset, presetName);
 }

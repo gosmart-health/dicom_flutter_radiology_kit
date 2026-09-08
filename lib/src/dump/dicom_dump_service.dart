@@ -20,7 +20,9 @@ class DicomDumpService {
         final tagInfo = DicomDictionary.lookup(tagKey, vr: vr);
 
         // If sequence, enrich child items recursively
-        if (vr == 'SQ' && elementCopy.containsKey('Value') && elementCopy['Value'] is List) {
+        if (vr == 'SQ' &&
+            elementCopy.containsKey('Value') &&
+            elementCopy['Value'] is List) {
           final items = elementCopy['Value'] as List;
           if (items.isNotEmpty && items.first is Map) {
             final enrichedItems = <Map<String, dynamic>>[];
@@ -60,7 +62,8 @@ class DicomDumpService {
         final tagHex = DicomDictionary.normalizeTagId(tagKey);
 
         List<List<DicomDumpEntry>>? seqItems;
-        final rawValue = val['Value'] ?? val['InlineBinary'] ?? val['BulkDataURI'];
+        final rawValue =
+            val['Value'] ?? val['InlineBinary'] ?? val['BulkDataURI'];
 
         if (vr == 'SQ' && val.containsKey('Value') && val['Value'] is List) {
           final list = val['Value'] as List;
@@ -75,7 +78,8 @@ class DicomDumpService {
           }
         }
 
-        final displayVal = formatDisplayValue(val, vr: vr, sequenceItems: seqItems);
+        final displayVal =
+            formatDisplayValue(val, vr: vr, sequenceItems: seqItems);
 
         entries.add(
           DicomDumpEntry(
@@ -124,12 +128,17 @@ class DicomDumpService {
 
       // Handle Person Name (PN)
       if (vr == 'PN') {
-        final names = val.map((v) {
-          if (v is Map) {
-            return v['Alphabetic']?.toString() ?? v.values.firstOrNull?.toString() ?? '';
-          }
-          return v.toString();
-        }).where((s) => s.isNotEmpty).toList();
+        final names = val
+            .map((v) {
+              if (v is Map) {
+                return v['Alphabetic']?.toString() ??
+                    v.values.firstOrNull?.toString() ??
+                    '';
+              }
+              return v.toString();
+            })
+            .where((s) => s.isNotEmpty)
+            .toList();
         return names.join(' \\ ');
       }
 

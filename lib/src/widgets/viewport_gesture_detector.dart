@@ -27,7 +27,8 @@ class ViewportGestureDetector extends StatefulWidget {
   });
 
   @override
-  State<ViewportGestureDetector> createState() => _ViewportGestureDetectorState();
+  State<ViewportGestureDetector> createState() =>
+      _ViewportGestureDetectorState();
 }
 
 class _ViewportGestureDetectorState extends State<ViewportGestureDetector> {
@@ -129,11 +130,13 @@ class _ViewportGestureDetectorState extends State<ViewportGestureDetector> {
     if (event.delta == Offset.zero) return;
 
     final isShift = HardwareKeyboard.instance.isShiftPressed;
-    final isCtrlOrCmd = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
+    final isCtrlOrCmd = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
 
     // 1. Zoom: Right Mouse Click Drag OR Shift + Left Click Drag
     final isRightDrag = (event.buttons & kSecondaryMouseButton) != 0;
-    final isShiftLeftDrag = ((event.buttons & kPrimaryMouseButton) != 0) && isShift;
+    final isShiftLeftDrag =
+        ((event.buttons & kPrimaryMouseButton) != 0) && isShift;
 
     if (isRightDrag || isShiftLeftDrag) {
       // Drag Up (negative dy) -> Zoom In (positive zoom delta)
@@ -144,7 +147,8 @@ class _ViewportGestureDetectorState extends State<ViewportGestureDetector> {
 
     // 2. Pan: Middle Mouse Drag OR Ctrl/Cmd + Left Click Drag
     final isMiddleDrag = (event.buttons & kMiddleMouseButton) != 0;
-    final isCtrlLeftDrag = ((event.buttons & kPrimaryMouseButton) != 0) && isCtrlOrCmd;
+    final isCtrlLeftDrag =
+        ((event.buttons & kPrimaryMouseButton) != 0) && isCtrlOrCmd;
 
     if (isMiddleDrag || isCtrlLeftDrag) {
       widget.controller.adjustPan(event.delta);
@@ -230,4 +234,3 @@ class _ViewportGestureDetectorState extends State<ViewportGestureDetector> {
     }
   }
 }
-

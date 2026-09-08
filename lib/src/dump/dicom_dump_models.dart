@@ -38,7 +38,8 @@ class DicomDumpEntry {
   });
 
   /// Whether this entry is a DICOM Sequence (`VR == 'SQ'`) with child items.
-  bool get isSequence => vr == 'SQ' || (sequenceItems != null && sequenceItems!.isNotEmpty);
+  bool get isSequence =>
+      vr == 'SQ' || (sequenceItems != null && sequenceItems!.isNotEmpty);
 
   /// Whether this tag is a Private Tag.
   bool get isPrivate => description.isPrivate;
@@ -110,4 +111,3 @@ class DicomDumpResult {
     return entries.map((e) => e.toJson()).toList();
   }
 }
-

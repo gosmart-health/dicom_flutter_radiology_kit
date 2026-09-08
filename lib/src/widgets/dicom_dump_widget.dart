@@ -63,7 +63,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
   @override
   void didUpdateWidget(covariant DicomDumpWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.metadataJson != oldWidget.metadataJson && widget.metadataJson != null) {
+    if (widget.metadataJson != oldWidget.metadataJson &&
+        widget.metadataJson != null) {
       _currentMetadata = widget.metadataJson;
     }
     if (widget.metadataStream != oldWidget.metadataStream) {
@@ -127,7 +128,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
           _buildHeaderBar(context, metadata, dumpResult),
 
           // Search & Filter Toolbar
-          if (widget.showSearchBar) _buildSearchToolbar(displayedEntries.length, dumpResult.count),
+          if (widget.showSearchBar)
+            _buildSearchToolbar(displayedEntries.length, dumpResult.count),
 
           const Divider(height: 1, thickness: 1, color: Color(0xFF30363D)),
 
@@ -172,7 +174,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.dataset_outlined, color: Color(0xFF388BFD), size: 20),
+          const Icon(Icons.dataset_outlined,
+              color: Color(0xFF388BFD), size: 20),
           const SizedBox(width: 10),
           Text(
             widget.title,
@@ -203,11 +206,13 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
             OutlinedButton.icon(
               onPressed: () => _exportJson(context, metadata),
               icon: const Icon(Icons.file_download_outlined, size: 14),
-              label: const Text('Download JSON', style: TextStyle(fontSize: 11)),
+              label:
+                  const Text('Download JSON', style: TextStyle(fontSize: 11)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF58A6FF),
                 side: const BorderSide(color: Color(0xFF30363D)),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               ),
             ),
             const SizedBox(width: 8),
@@ -220,7 +225,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF7EE787),
                 side: const BorderSide(color: Color(0xFF30363D)),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               ),
             ),
             const SizedBox(width: 8),
@@ -230,7 +236,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
           IconButton(
             icon: const Icon(Icons.close, size: 18, color: Color(0xFF8B949E)),
             tooltip: 'Close Dump',
-            onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
+            onPressed: () =>
+                Navigator.of(context, rootNavigator: true).maybePop(),
           ),
         ],
       ),
@@ -255,12 +262,16 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                 controller: _searchController,
                 style: const TextStyle(fontSize: 12, color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Search attributes by tag "(0010,0020)", hex "00100020", name, or value...',
-                  hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF6E7681)),
-                  prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF8B949E)),
+                  hintText:
+                      'Search attributes by tag "(0010,0020)", hex "00100020", name, or value...',
+                  hintStyle:
+                      const TextStyle(fontSize: 12, color: Color(0xFF6E7681)),
+                  prefixIcon: const Icon(Icons.search,
+                      size: 16, color: Color(0xFF8B949E)),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 14, color: Color(0xFF8B949E)),
+                          icon: const Icon(Icons.clear,
+                              size: 14, color: Color(0xFF8B949E)),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -294,35 +305,50 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
             width: 135,
             child: Text(
               'Tag',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B949E)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B949E)),
             ),
           ),
           SizedBox(
             width: 50,
             child: Text(
               'VR',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B949E)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B949E)),
             ),
           ),
           SizedBox(
             width: 45,
             child: Text(
               'VM',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B949E)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B949E)),
             ),
           ),
           Expanded(
             flex: 3,
             child: Text(
               'Description',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B949E)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B949E)),
             ),
           ),
           Expanded(
             flex: 5,
             child: Text(
               'Value',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B949E)),
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B949E)),
             ),
           ),
         ],
@@ -333,7 +359,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
   Widget _buildEntryRow(DicomDumpEntry entry, int index) {
     final isEven = index % 2 == 0;
     final rowBg = isEven ? const Color(0xFF0F1218) : const Color(0xFF13171F);
-    final hasChildren = entry.sequenceItems != null && entry.sequenceItems!.isNotEmpty;
+    final hasChildren =
+        entry.sequenceItems != null && entry.sequenceItems!.isNotEmpty;
     final isExpanded = _expandedSequences.contains(entry.tagHex);
 
     return Column(
@@ -365,7 +392,9 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                           });
                         },
                         child: Icon(
-                          isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                          isExpanded
+                              ? Icons.arrow_drop_down
+                              : Icons.arrow_right,
                           size: 16,
                           color: const Color(0xFF58A6FF),
                         ),
@@ -391,7 +420,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
               SizedBox(
                 width: 50,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: const Color(0xFF21262D),
                     borderRadius: BorderRadius.circular(3),
@@ -432,7 +462,9 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                         entry.description.name,
                         style: TextStyle(
                           fontSize: 12,
-                          color: entry.isPrivate ? const Color(0xFFFFA657) : Colors.white,
+                          color: entry.isPrivate
+                              ? const Color(0xFFFFA657)
+                              : Colors.white,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -440,14 +472,18 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                     if (entry.isPrivate) ...[
                       const SizedBox(width: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
                           color: const Color(0xFF5C2B0E),
                           borderRadius: BorderRadius.circular(3),
                         ),
                         child: const Text(
                           'PRIVATE',
-                          style: TextStyle(fontSize: 8, color: Color(0xFFFFA657), fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 8,
+                              color: Color(0xFFFFA657),
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -466,22 +502,32 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                         entry.displayValue,
                         style: TextStyle(
                           fontSize: 12,
-                          fontFamily: (entry.vr == 'UI' || entry.vr == 'SH' || entry.vr == 'LO') ? 'monospace' : null,
-                          color: entry.isSequence ? const Color(0xFF7EE787) : const Color(0xFFC9D1D9),
+                          fontFamily: (entry.vr == 'UI' ||
+                                  entry.vr == 'SH' ||
+                                  entry.vr == 'LO')
+                              ? 'monospace'
+                              : null,
+                          color: entry.isSequence
+                              ? const Color(0xFF7EE787)
+                              : const Color(0xFFC9D1D9),
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.copy, size: 12, color: Color(0xFF6E7681)),
+                      icon: const Icon(Icons.copy,
+                          size: 12, color: Color(0xFF6E7681)),
                       tooltip: 'Copy Value',
                       splashRadius: 14,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                      constraints:
+                          const BoxConstraints(minWidth: 20, minHeight: 20),
                       onPressed: () {
-                        Clipboard.setData(ClipboardData(text: entry.displayValue));
+                        Clipboard.setData(
+                            ClipboardData(text: entry.displayValue));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Copied ${entry.tagFormatted} value to clipboard'),
+                            content: Text(
+                                'Copied ${entry.tagFormatted} value to clipboard'),
                             duration: const Duration(seconds: 1),
                           ),
                         );
@@ -496,13 +542,16 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
 
         // Nested Sequence Items
         if (hasChildren && isExpanded) ...[
-          for (int itemIdx = 0; itemIdx < entry.sequenceItems!.length; itemIdx++) ...[
+          for (int itemIdx = 0;
+              itemIdx < entry.sequenceItems!.length;
+              itemIdx++) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
               color: const Color(0xFF161B22),
               child: Row(
                 children: [
-                  const Icon(Icons.subdirectory_arrow_right, size: 12, color: Color(0xFF58A6FF)),
+                  const Icon(Icons.subdirectory_arrow_right,
+                      size: 12, color: Color(0xFF58A6FF)),
                   const SizedBox(width: 6),
                   Text(
                     'Sequence Item #${itemIdx + 1}',
@@ -515,7 +564,9 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
                 ],
               ),
             ),
-            for (int childIdx = 0; childIdx < entry.sequenceItems![itemIdx].length; childIdx++)
+            for (int childIdx = 0;
+                childIdx < entry.sequenceItems![itemIdx].length;
+                childIdx++)
               _buildEntryRow(entry.sequenceItems![itemIdx][childIdx], childIdx),
           ],
         ],
@@ -523,7 +574,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
     );
   }
 
-  Future<void> _exportJson(BuildContext context, Map<String, dynamic> metadata) async {
+  Future<void> _exportJson(
+      BuildContext context, Map<String, dynamic> metadata) async {
     final enrichedJson = DicomDumpService.dumpJson(metadata);
     final jsonStr = const JsonEncoder.withIndent('  ').convert(enrichedJson);
     final filename = 'dicom_dump_${DateTime.now().millisecondsSinceEpoch}.json';
@@ -544,7 +596,8 @@ class _DicomDumpWidgetState extends State<DicomDumpWidget> {
     }
   }
 
-  Future<void> _exportCsv(BuildContext context, DicomDumpResult dumpResult) async {
+  Future<void> _exportCsv(
+      BuildContext context, DicomDumpResult dumpResult) async {
     final buffer = StringBuffer();
     buffer.writeln('Tag,VR,VM,Description,Value');
 

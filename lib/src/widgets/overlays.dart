@@ -25,8 +25,10 @@ class ViewportOverlays extends StatelessWidget {
                 left: 12,
                 child: _buildOverlayText([
                   if (controller.patientName.isNotEmpty) controller.patientName,
-                  if (controller.patientId.isNotEmpty) 'ID: ${controller.patientId}',
-                  if (controller.studyDescription.isNotEmpty) controller.studyDescription,
+                  if (controller.patientId.isNotEmpty)
+                    'ID: ${controller.patientId}',
+                  if (controller.studyDescription.isNotEmpty)
+                    controller.studyDescription,
                 ]),
               ),
 
@@ -35,7 +37,8 @@ class ViewportOverlays extends StatelessWidget {
                 top: 12,
                 right: 12,
                 child: _buildOverlayText([
-                  if (controller.seriesDescription.isNotEmpty) controller.seriesDescription,
+                  if (controller.seriesDescription.isNotEmpty)
+                    controller.seriesDescription,
                   if (controller.currentFrame != null)
                     'Dim: ${controller.currentFrame!.width}x${controller.currentFrame!.height}',
                 ], crossAxisAlignment: CrossAxisAlignment.end),
@@ -47,7 +50,8 @@ class ViewportOverlays extends StatelessWidget {
                 left: 12,
                 child: _buildOverlayText([
                   'W: ${controller.windowWidth.toInt()} L: ${controller.windowCenter.toInt()}',
-                  if (controller.activePreset != null) 'Preset: ${controller.activePreset!.name}',
+                  if (controller.activePreset != null)
+                    'Preset: ${controller.activePreset!.name}',
                   'Zoom: ${(controller.zoom * 100).toInt()}%',
                 ]),
               ),
@@ -96,7 +100,8 @@ class ViewportOverlays extends StatelessWidget {
     );
   }
 
-  Widget _buildOverlayText(List<String> lines, {CrossAxisAlignment crossAxisAlignment = CrossAxisAlignment.start}) {
+  Widget _buildOverlayText(List<String> lines,
+      {CrossAxisAlignment crossAxisAlignment = CrossAxisAlignment.start}) {
     if (lines.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: crossAxisAlignment,
@@ -110,7 +115,10 @@ class ViewportOverlays extends StatelessWidget {
                 fontSize: 12,
                 fontFamily: 'monospace',
                 shadows: [
-                  Shadow(blurRadius: 3.0, color: Colors.black, offset: Offset(1, 1)),
+                  Shadow(
+                      blurRadius: 3.0,
+                      color: Colors.black,
+                      offset: Offset(1, 1)),
                 ],
               ),
             ),

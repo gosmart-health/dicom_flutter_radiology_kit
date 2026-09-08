@@ -6,12 +6,15 @@ import 'dart:io';
 
 void main() {
   group('Live Mock Server (localhost:8000) Integration Test', () {
-    test('Queries live studies, series, buffers frames, and renders ui.Image', () async {
+    test('Queries live studies, series, buffers frames, and renders ui.Image',
+        () async {
       try {
-        final socket = await Socket.connect('localhost', 8000, timeout: const Duration(seconds: 1));
+        final socket = await Socket.connect('localhost', 8000,
+            timeout: const Duration(seconds: 1));
         await socket.close();
       } catch (e) {
-        print('Skipping live mock server test: mock server not reachable on localhost:8000');
+        print(
+            'Skipping live mock server test: mock server not reachable on localhost:8000');
         return;
       }
 
@@ -25,13 +28,16 @@ void main() {
       final study = studies.first;
       expect(study.studyInstanceUID, isNotEmpty);
       expect(study.patientName, isNotEmpty);
-      print('First study: Patient=${study.patientName}, ID=${study.patientId}, Modality=${study.modality}, ISO Date=${study.studyDateTimeIso}');
+      print(
+          'First study: Patient=${study.patientName}, ID=${study.patientId}, Modality=${study.modality}, ISO Date=${study.studyDateTimeIso}');
 
       // 2. Fetch series
-      final seriesList = await client.querySeries(studyInstanceUID: study.studyInstanceUID);
+      final seriesList =
+          await client.querySeries(studyInstanceUID: study.studyInstanceUID);
       expect(seriesList, isNotEmpty);
       final series = seriesList.first;
-      print('First series: UID=${series.seriesInstanceUID}, Description=${series.seriesDescription}, Instances=${series.numberOfInstances}');
+      print(
+          'First series: UID=${series.seriesInstanceUID}, Description=${series.seriesDescription}, Instances=${series.numberOfInstances}');
 
       // 3. Download series buffers
       final instances = await client.fetchInstanceMetadata(
@@ -64,7 +70,8 @@ void main() {
       expect(pixelFrame.width, firstInst.rows);
       expect(pixelFrame.height, firstInst.columns);
       expect(pixelFrame.bitsAllocated, 16);
-      print('Decoded PixelFrame: ${pixelFrame.width}x${pixelFrame.height}, Photometric: ${pixelFrame.photometricInterpretation}');
+      print(
+          'Decoded PixelFrame: ${pixelFrame.width}x${pixelFrame.height}, Photometric: ${pixelFrame.photometricInterpretation}');
 
       final (minVal, maxVal) = pixelFrame.getMinMax();
       print('Pixel buffer min=$minVal, max=$maxVal');
@@ -90,7 +97,8 @@ void main() {
       final img = await completer.future;
       expect(img.width, pixelFrame.width);
       expect(img.height, pixelFrame.height);
-      print('Successfully rendered live mock server frame into ${img.width}x${img.height} ui.Image!');
+      print(
+          'Successfully rendered live mock server frame into ${img.width}x${img.height} ui.Image!');
       img.dispose();
     });
   });

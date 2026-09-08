@@ -13,7 +13,8 @@ class SyntheticPatterns {
     // Helper to write HU into raw pixel buffer: raw = (HU - rescaleIntercept) / rescaleSlope
     void setHu(int x, int y, double hu) {
       if (x < 0 || x >= size || y < 0 || y >= size) return;
-      final raw = ((hu - rescaleIntercept) / rescaleSlope).round().clamp(-32768, 32767);
+      final raw =
+          ((hu - rescaleIntercept) / rescaleSlope).round().clamp(-32768, 32767);
       rawPixels[y * size + x] = raw;
     }
 
@@ -126,16 +127,21 @@ class SyntheticPatterns {
           val = ((stepIndex / 15.0) * maxVal).round();
 
           // Low-contrast 5% and 95% target patches within 0% and 100% blocks
-          if (stepIndex == 0 && (x % (size ~/ 16) > size ~/ 48) && (y > size * 0.45 && y < size * 0.55)) {
+          if (stepIndex == 0 &&
+              (x % (size ~/ 16) > size ~/ 48) &&
+              (y > size * 0.45 && y < size * 0.55)) {
             val = (maxVal * 0.05).round();
-          } else if (stepIndex == 15 && (x % (size ~/ 16) > size ~/ 48) && (y > size * 0.45 && y < size * 0.55)) {
+          } else if (stepIndex == 15 &&
+              (x % (size ~/ 16) > size ~/ 48) &&
+              (y > size * 0.45 && y < size * 0.55)) {
             val = (maxVal * 0.95).round();
           }
         } else {
           // Grid lines and crossbars
           final bool isGridX = (x % (size ~/ 8)) == 0;
           final bool isGridY = (y % (size ~/ 8)) == 0;
-          final bool isBorder = x < 4 || x >= size - 4 || y < 4 || y >= size - 4;
+          final bool isBorder =
+              x < 4 || x >= size - 4 || y < 4 || y >= size - 4;
 
           if (isBorder || isGridX || isGridY) {
             val = maxVal;
@@ -174,7 +180,9 @@ class SyntheticPatterns {
       for (int x = 0; x < size; x++) {
         final double t = x / (size - 1);
         final double hu = -1000.0 + (t * 2500.0);
-        final raw = ((hu - rescaleIntercept) / rescaleSlope).round().clamp(-32768, 32767);
+        final raw = ((hu - rescaleIntercept) / rescaleSlope)
+            .round()
+            .clamp(-32768, 32767);
         rawPixels[y * size + x] = raw;
       }
     }

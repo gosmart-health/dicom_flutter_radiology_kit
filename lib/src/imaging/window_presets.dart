@@ -24,7 +24,8 @@ class WindowPreset {
 
 /// Standard clinical DICOM window presets.
 class WindowPresets {
-  static const WindowPreset softTissue = WindowPreset('Soft Tissue', 40.0, 400.0);
+  static const WindowPreset softTissue =
+      WindowPreset('Soft Tissue', 40.0, 400.0);
   static const WindowPreset bone = WindowPreset('Bone', 400.0, 1800.0);
   static const WindowPreset lung = WindowPreset('Lung', -600.0, 1500.0);
   static const WindowPreset brain = WindowPreset('Brain', 40.0, 80.0);

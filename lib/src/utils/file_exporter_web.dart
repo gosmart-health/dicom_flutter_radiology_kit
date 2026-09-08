@@ -13,7 +13,8 @@ class FileExporter {
     try {
       final bytes = utf8.encode(content);
       final jsArray = bytes.toJS;
-      final blob = web.Blob([jsArray].toJS, web.BlobPropertyBag(type: mimeType));
+      final blob =
+          web.Blob([jsArray].toJS, web.BlobPropertyBag(type: mimeType));
       final url = web.URL.createObjectURL(blob);
       final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
       anchor.href = url;
@@ -28,4 +29,3 @@ class FileExporter {
     }
   }
 }
-

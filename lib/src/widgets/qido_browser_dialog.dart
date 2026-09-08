@@ -12,7 +12,8 @@ class QidoBrowserDialog extends StatefulWidget {
   final String? initialServerUrl;
   final http.Client? httpClient;
   final DicomCompressionMode defaultCompressionMode;
-  final void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)? onSeriesLoaded;
+  final void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)?
+      onSeriesLoaded;
   final void Function(DicomStudy study)? onStudySelected;
 
   const QidoBrowserDialog({
@@ -28,8 +29,10 @@ class QidoBrowserDialog extends StatefulWidget {
   static DicomCompressionMode? _lastSelectedCompressionMode;
 
   /// Active session compression mode.
-  static DicomCompressionMode? get activeCompressionMode => _lastSelectedCompressionMode;
-  static set activeCompressionMode(DicomCompressionMode? mode) => _lastSelectedCompressionMode = mode;
+  static DicomCompressionMode? get activeCompressionMode =>
+      _lastSelectedCompressionMode;
+  static set activeCompressionMode(DicomCompressionMode? mode) =>
+      _lastSelectedCompressionMode = mode;
 
   /// Static helper to launch the browser dialog.
   static Future<DicomSeriesBuffer?> show(
@@ -37,7 +40,8 @@ class QidoBrowserDialog extends StatefulWidget {
     String? initialServerUrl,
     http.Client? httpClient,
     DicomCompressionMode defaultCompressionMode = DicomCompressionMode.raw,
-    void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)? onSeriesLoaded,
+    void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)?
+        onSeriesLoaded,
     void Function(DicomStudy study)? onStudySelected,
   }) {
     return showDialog<DicomSeriesBuffer>(
@@ -80,8 +84,10 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedCompressionMode = QidoBrowserDialog._lastSelectedCompressionMode ?? widget.defaultCompressionMode;
-    final initialUrl = widget.initialServerUrl ?? DicomServerUrlStore.getLastUsedUrl();
+    _selectedCompressionMode = QidoBrowserDialog._lastSelectedCompressionMode ??
+        widget.defaultCompressionMode;
+    final initialUrl =
+        widget.initialServerUrl ?? DicomServerUrlStore.getLastUsedUrl();
     _urlController = TextEditingController(text: initialUrl);
     _serverHistory = DicomServerUrlStore.getHistory();
     _filterController = TextEditingController();
@@ -181,7 +187,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
     });
 
     try {
-      final series = await _client!.querySeries(studyInstanceUID: study.studyInstanceUID);
+      final series =
+          await _client!.querySeries(studyInstanceUID: study.studyInstanceUID);
       if (!mounted) return;
       setState(() {
         _seriesList = series;
@@ -202,7 +209,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
       _isDownloading = true;
       _errorMessage = null;
     });
-    _downloadProgressNotifier.value = (loaded: 0, total: series.numberOfInstances);
+    _downloadProgressNotifier.value =
+        (loaded: 0, total: series.numberOfInstances);
 
     try {
       final seriesBuffer = await _client!.downloadSeriesBuffers(
@@ -245,8 +253,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
     return Dialog(
       backgroundColor: const Color(0xFF161B22),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF30363D))),
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Color(0xFF30363D))),
       insetPadding: const EdgeInsets.all(24),
       child: SizedBox(
         width: dialogWidth,
@@ -294,11 +302,13 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.manage_search_rounded, color: Color(0xFF58A6FF), size: 22),
+          const Icon(Icons.manage_search_rounded,
+              color: Color(0xFF58A6FF), size: 22),
           const SizedBox(width: 10),
           const Text(
             'DICOMweb QIDO-RS Study Browser',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
           ),
           const Spacer(),
           IconButton(
@@ -330,9 +340,11 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 isDense: true,
                 filled: true,
                 fillColor: const Color(0xFF161B22),
-                prefixIcon: const Icon(Icons.dns_outlined, size: 18, color: Color(0xFF58A6FF)),
+                prefixIcon: const Icon(Icons.dns_outlined,
+                    size: 18, color: Color(0xFF58A6FF)),
                 suffixIcon: PopupMenuButton<String>(
-                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF58A6FF)),
+                  icon: const Icon(Icons.arrow_drop_down,
+                      color: Color(0xFF58A6FF)),
                   tooltip: 'Recent DICOMweb Roots',
                   color: const Color(0xFF1C2128),
                   elevation: 8,
@@ -343,7 +355,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                   onSelected: _onSelectServerUrl,
                   itemBuilder: (context) {
                     return _serverHistory.map((url) {
-                      final isCurrent = url.toLowerCase() == _urlController.text.trim().toLowerCase();
+                      final isCurrent = url.toLowerCase() ==
+                          _urlController.text.trim().toLowerCase();
                       return PopupMenuItem<String>(
                         value: url,
                         height: 36,
@@ -352,7 +365,9 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                             Icon(
                               isCurrent ? Icons.check : Icons.history,
                               size: 16,
-                              color: isCurrent ? const Color(0xFF58A6FF) : const Color(0xFF8B949E),
+                              color: isCurrent
+                                  ? const Color(0xFF58A6FF)
+                                  : const Color(0xFF8B949E),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -360,8 +375,12 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                 url,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isCurrent ? const Color(0xFF58A6FF) : Colors.white,
-                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                  color: isCurrent
+                                      ? const Color(0xFF58A6FF)
+                                      : Colors.white,
+                                  fontWeight: isCurrent
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -373,7 +392,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                   },
                 ),
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
               onSubmitted: (_) => _fetchStudies(),
             ),
@@ -389,7 +409,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 isDense: true,
                 filled: true,
                 fillColor: const Color(0xFF161B22),
-                prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF8B949E)),
+                prefixIcon: const Icon(Icons.search,
+                    size: 18, color: Color(0xFF8B949E)),
                 suffixIcon: _filterController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 16),
@@ -397,7 +418,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                       )
                     : null,
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
             ),
           ),
@@ -419,12 +441,17 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                   child: DropdownButton<DicomCompressionMode>(
                     value: _selectedCompressionMode,
                     dropdownColor: const Color(0xFF1C2128),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                    icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF58A6FF), size: 18),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
+                    icon: const Icon(Icons.arrow_drop_down,
+                        color: Color(0xFF58A6FF), size: 18),
                     items: DicomCompressionMode.values.map((mode) {
                       return DropdownMenuItem(
                         value: mode,
-                        child: Text(mode.label, style: const TextStyle(fontSize: 11)),
+                        child: Text(mode.label,
+                            style: const TextStyle(fontSize: 11)),
                       );
                     }).toList(),
                     onChanged: (mode) {
@@ -445,7 +472,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 ? const SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.refresh, size: 16),
             label: const Text('Query QIDO'),
@@ -490,7 +518,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
           children: [
             CircularProgressIndicator(strokeWidth: 2.5),
             SizedBox(height: 12),
-            Text('Querying DICOMweb studies...', style: TextStyle(color: Color(0xFF8B949E))),
+            Text('Querying DICOMweb studies...',
+                style: TextStyle(color: Color(0xFF8B949E))),
           ],
         ),
       );
@@ -501,10 +530,13 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.folder_off_outlined, size: 48, color: Color(0xFF484F58)),
+            const Icon(Icons.folder_off_outlined,
+                size: 48, color: Color(0xFF484F58)),
             const SizedBox(height: 12),
             Text(
-              _allStudies.isEmpty ? 'No studies found on server' : 'No matching studies found',
+              _allStudies.isEmpty
+                  ? 'No studies found on server'
+                  : 'No matching studies found',
               style: const TextStyle(color: Color(0xFF8B949E), fontSize: 14),
             ),
             const SizedBox(height: 8),
@@ -541,30 +573,41 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
         Expanded(
           child: ListView.separated(
             itemCount: _filteredStudies.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: Color(0xFF21262D)),
             itemBuilder: (context, index) {
               final study = _filteredStudies[index];
-              final isSelected = _selectedStudy?.studyInstanceUID == study.studyInstanceUID;
+              final isSelected =
+                  _selectedStudy?.studyInstanceUID == study.studyInstanceUID;
 
               return Material(
-                color: isSelected ? const Color(0xFF1F6FEB).withValues(alpha: 0.2) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF1F6FEB).withValues(alpha: 0.2)
+                    : Colors.transparent,
                 child: InkWell(
                   onTap: _isDownloading ? null : () => _selectStudy(study),
                   hoverColor: const Color(0xFF30363D).withValues(alpha: 0.4),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       border: isSelected
-                          ? const Border(left: BorderSide(color: Color(0xFF58A6FF), width: 3))
+                          ? const Border(
+                              left: BorderSide(
+                                  color: Color(0xFF58A6FF), width: 3))
                           : null,
                     ),
                     child: Row(
                       children: [
-                        _buildDataCell(study.patientName, flex: 3, isBold: true),
-                        _buildDataCell(study.patientId, flex: 2, isMonospace: true),
+                        _buildDataCell(study.patientName,
+                            flex: 3, isBold: true),
+                        _buildDataCell(study.patientId,
+                            flex: 2, isMonospace: true),
                         _buildDataCell(study.patientBirthDate, flex: 2),
-                        _buildDataCell(study.accessionNumber, flex: 2, isMonospace: true),
-                        _buildDataCell(study.studyDateTimeIso, flex: 3, isMonospace: true),
+                        _buildDataCell(study.accessionNumber,
+                            flex: 2, isMonospace: true),
+                        _buildDataCell(study.studyDateTimeIso,
+                            flex: 3, isMonospace: true),
                         _buildModalityCell(study.modality, flex: 1),
                       ],
                     ),
@@ -596,7 +639,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.touch_app_outlined, size: 36, color: Color(0xFF484F58)),
+              Icon(Icons.touch_app_outlined,
+                  size: 36, color: Color(0xFF484F58)),
               SizedBox(height: 10),
               Text(
                 'Select a Study from the list\nto view its Series and Instances',
@@ -626,12 +670,16 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.folder_special, size: 16, color: Color(0xFF58A6FF)),
+                    const Icon(Icons.folder_special,
+                        size: 16, color: Color(0xFF58A6FF)),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _selectedStudy!.studyDescription,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -641,19 +689,26 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 const SizedBox(height: 6),
                 Text(
                   'Patient: ${_selectedStudy!.patientName} (${_selectedStudy!.patientId})',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFFC9D1D9)),
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFFC9D1D9)),
                 ),
                 Text(
                   'Date: ${_selectedStudy!.studyDateTimeIso} • Modality: ${_selectedStudy!.modality}',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E)),
+                  style:
+                      const TextStyle(fontSize: 11, color: Color(0xFF8B949E)),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Text('Negotiated Mode: ', style: TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
+                    const Text('Negotiated Mode: ',
+                        style:
+                            TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
                     Text(
                       _selectedCompressionMode.label,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF58A6FF)),
                     ),
                   ],
                 ),
@@ -686,15 +741,18 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : _seriesList.isEmpty
                     ? const Center(
-                        child: Text('No series available', style: TextStyle(color: Color(0xFF8B949E))),
+                        child: Text('No series available',
+                            style: TextStyle(color: Color(0xFF8B949E))),
                       )
                     : ListView.separated(
                         itemCount: _seriesList.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFF21262D)),
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: Color(0xFF21262D)),
                         itemBuilder: (context, index) {
                           final series = _seriesList[index];
                           final isDownloadingThis = _isDownloading &&
-                              _selectedSeries?.seriesInstanceUID == series.seriesInstanceUID;
+                              _selectedSeries?.seriesInstanceUID ==
+                                  series.seriesInstanceUID;
 
                           return Container(
                             padding: const EdgeInsets.all(12),
@@ -704,14 +762,17 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF238636),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         series.modality,
-                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -730,20 +791,27 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                 const SizedBox(height: 6),
                                 Text(
                                   '${series.numberOfInstances} instance(s) • Dr. ${series.performingPhysician}',
-                                  style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E)),
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Color(0xFF8B949E)),
                                 ),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    onPressed: _isDownloading ? null : () => _loadSeriesIntoBuffer(series),
+                                    onPressed: _isDownloading
+                                        ? null
+                                        : () => _loadSeriesIntoBuffer(series),
                                     icon: isDownloadingThis
                                         ? const SizedBox(
                                             width: 14,
                                             height: 14,
-                                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white),
                                           )
-                                        : const Icon(Icons.download_for_offline_outlined, size: 16),
+                                        : const Icon(
+                                            Icons.download_for_offline_outlined,
+                                            size: 16),
                                     label: Text(
                                       isDownloadingThis
                                           ? 'Buffering...'
@@ -753,7 +821,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF1F6FEB),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8),
                                     ),
                                   ),
                                 ),
@@ -789,11 +858,15 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                 children: [
                   Text(
                     'Buffering [${_selectedCompressionMode.label}] into 16-bit memory: $loaded / $total frames',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF58A6FF)),
+                    style:
+                        const TextStyle(fontSize: 12, color: Color(0xFF58A6FF)),
                   ),
                   Text(
                     '${(progress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ],
               ),
@@ -801,7 +874,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
               LinearProgressIndicator(
                 value: progress > 0 ? progress : null,
                 backgroundColor: const Color(0xFF21262D),
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF388BFD)),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(Color(0xFF388BFD)),
               ),
             ],
           ),
@@ -825,7 +899,8 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
     );
   }
 
-  Widget _buildDataCell(String value, {required int flex, bool isBold = false, bool isMonospace = false}) {
+  Widget _buildDataCell(String value,
+      {required int flex, bool isBold = false, bool isMonospace = false}) {
     return Expanded(
       flex: flex,
       child: Text(
@@ -854,7 +929,10 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
         child: Text(
           modality,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
+          style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF58A6FF)),
         ),
       ),
     );

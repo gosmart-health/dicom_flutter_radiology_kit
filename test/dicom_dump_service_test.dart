@@ -7,7 +7,8 @@ void main() {
       expect(DicomDictionary.standardTagCount, greaterThan(5000));
     });
 
-    test('Resolves standard tag (0008,0010) matching user requested schema', () {
+    test('Resolves standard tag (0008,0010) matching user requested schema',
+        () {
       final tagInfo = DicomDictionary.lookup('(0008,0010)');
       expect(tagInfo.tag, '(0008,0010)');
       expect(tagInfo.name, 'Recognition Code');
@@ -107,7 +108,8 @@ void main() {
       },
     };
 
-    test('dumpJson enriches DICOM JSON with description attribute definition', () {
+    test('dumpJson enriches DICOM JSON with description attribute definition',
+        () {
       final enriched = DicomDumpService.dumpJson(sampleDicomJson);
 
       expect(enriched.containsKey('00080010'), isTrue);
@@ -136,7 +138,9 @@ void main() {
       expect(privateItem['description']['name'], 'Private Tag');
     });
 
-    test('dump produces structured DicomDumpResult with formatted values and search', () {
+    test(
+        'dump produces structured DicomDumpResult with formatted values and search',
+        () {
       final result = DicomDumpService.dump(sampleDicomJson);
       expect(result.count, 6);
 
@@ -161,4 +165,3 @@ void main() {
     });
   });
 }
-

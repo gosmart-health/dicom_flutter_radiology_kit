@@ -122,7 +122,10 @@ class _DicomViewportState extends State<DicomViewport> {
           continue;
         }
 
-        if (frame == _lastFrame && center == _lastCenter && width == _lastWidth && _renderedImage != null) {
+        if (frame == _lastFrame &&
+            center == _lastCenter &&
+            width == _lastWidth &&
+            _renderedImage != null) {
           continue;
         }
 
@@ -229,15 +232,18 @@ class _ViewportPainter extends CustomPainter {
     canvas.clipRect(Offset.zero & size);
 
     // Compute aspect-ratio-preserving fit scale
-    final availableWidth = (size.width - inset.horizontal).clamp(1.0, double.infinity);
-    final availableHeight = (size.height - inset.vertical).clamp(1.0, double.infinity);
+    final availableWidth =
+        (size.width - inset.horizontal).clamp(1.0, double.infinity);
+    final availableHeight =
+        (size.height - inset.vertical).clamp(1.0, double.infinity);
     final double scaleX = availableWidth / image!.width;
     final double scaleY = availableHeight / image!.height;
     final double fitScale = math.min(scaleX, scaleY);
     final double effectiveScale = fitScale * zoom;
 
     canvas.save();
-    canvas.translate(size.width / 2.0 + panOffset.dx, size.height / 2.0 + panOffset.dy);
+    canvas.translate(
+        size.width / 2.0 + panOffset.dx, size.height / 2.0 + panOffset.dy);
     canvas.scale(effectiveScale, effectiveScale);
     canvas.translate(-image!.width / 2.0, -image!.height / 2.0);
 
@@ -257,4 +263,3 @@ class _ViewportPainter extends CustomPainter {
         oldDelegate.inset != inset;
   }
 }
-

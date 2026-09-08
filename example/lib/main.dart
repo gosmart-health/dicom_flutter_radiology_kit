@@ -89,7 +89,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       final controller = ViewportController();
       controller.onSliceStep = (direction) {
         if (_loadedSeries != null && _loadedSeries!.frameCount > 1) {
-          final nextIdx = (_currentFrameIndex + direction).clamp(0, _loadedSeries!.frameCount - 1);
+          final nextIdx = (_currentFrameIndex + direction)
+              .clamp(0, _loadedSeries!.frameCount - 1);
           if (nextIdx != _currentFrameIndex) {
             _goToFrame(nextIdx);
           }
@@ -257,36 +258,114 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     }
     // Synthetic fallback metadata for test pattern fixtures
     return {
-      '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.7']},
-      '00080018': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1.1']},
-      '00080020': {'vr': 'DA', 'Value': ['20260908']},
-      '00080030': {'vr': 'TM', 'Value': ['120000']},
-      '00080060': {'vr': 'CS', 'Value': ['OT']},
-      '00080070': {'vr': 'LO', 'Value': ['RadiologyKit']},
-      '00080080': {'vr': 'LO', 'Value': ['Radiology Department']},
-      '00081030': {'vr': 'LO', 'Value': [_selectedFixture]},
-      '0008103E': {'vr': 'LO', 'Value': ['Synthetic Calibration Test Pattern']},
+      '00080016': {
+        'vr': 'UI',
+        'Value': ['1.2.840.10008.5.1.4.1.1.7']
+      },
+      '00080018': {
+        'vr': 'UI',
+        'Value': ['1.2.826.0.1.3680043.9.7133.1.1']
+      },
+      '00080020': {
+        'vr': 'DA',
+        'Value': ['20260908']
+      },
+      '00080030': {
+        'vr': 'TM',
+        'Value': ['120000']
+      },
+      '00080060': {
+        'vr': 'CS',
+        'Value': ['OT']
+      },
+      '00080070': {
+        'vr': 'LO',
+        'Value': ['RadiologyKit']
+      },
+      '00080080': {
+        'vr': 'LO',
+        'Value': ['Radiology Department']
+      },
+      '00081030': {
+        'vr': 'LO',
+        'Value': [_selectedFixture]
+      },
+      '0008103E': {
+        'vr': 'LO',
+        'Value': ['Synthetic Calibration Test Pattern']
+      },
       '00100010': {
         'vr': 'PN',
         'Value': [
-          {'Alphabetic': _selectedFixture.contains('TG18') ? 'QUALITY^CONTROL' : 'CALIBRATION^RAMP'}
+          {
+            'Alphabetic': _selectedFixture.contains('TG18')
+                ? 'QUALITY^CONTROL'
+                : 'CALIBRATION^RAMP'
+          }
         ]
       },
-      '00100020': {'vr': 'LO', 'Value': [_selectedFixture.contains('TG18') ? 'QC-TG18-001' : 'RAMP-16BIT-002']},
-      '00100040': {'vr': 'CS', 'Value': ['O']},
-      '0020000D': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1']},
-      '0020000E': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1.1']},
-      '00200013': {'vr': 'IS', 'Value': ['1']},
-      '00280002': {'vr': 'US', 'Value': [1]},
-      '00280004': {'vr': 'CS', 'Value': ['MONOCHROME2']},
-      '00280010': {'vr': 'US', 'Value': [512]},
-      '00280011': {'vr': 'US', 'Value': [512]},
-      '00280100': {'vr': 'US', 'Value': [16]},
-      '00280101': {'vr': 'US', 'Value': [12]},
-      '00280102': {'vr': 'US', 'Value': [11]},
-      '00280103': {'vr': 'US', 'Value': [0]},
-      '00281050': {'vr': 'DS', 'Value': [_primaryController.windowCenter.toStringAsFixed(0)]},
-      '00281051': {'vr': 'DS', 'Value': [_primaryController.windowWidth.toStringAsFixed(0)]},
+      '00100020': {
+        'vr': 'LO',
+        'Value': [
+          _selectedFixture.contains('TG18') ? 'QC-TG18-001' : 'RAMP-16BIT-002'
+        ]
+      },
+      '00100040': {
+        'vr': 'CS',
+        'Value': ['O']
+      },
+      '0020000D': {
+        'vr': 'UI',
+        'Value': ['1.2.826.0.1.3680043.9.7133.1']
+      },
+      '0020000E': {
+        'vr': 'UI',
+        'Value': ['1.2.826.0.1.3680043.9.7133.1.1']
+      },
+      '00200013': {
+        'vr': 'IS',
+        'Value': ['1']
+      },
+      '00280002': {
+        'vr': 'US',
+        'Value': [1]
+      },
+      '00280004': {
+        'vr': 'CS',
+        'Value': ['MONOCHROME2']
+      },
+      '00280010': {
+        'vr': 'US',
+        'Value': [512]
+      },
+      '00280011': {
+        'vr': 'US',
+        'Value': [512]
+      },
+      '00280100': {
+        'vr': 'US',
+        'Value': [16]
+      },
+      '00280101': {
+        'vr': 'US',
+        'Value': [12]
+      },
+      '00280102': {
+        'vr': 'US',
+        'Value': [11]
+      },
+      '00280103': {
+        'vr': 'US',
+        'Value': [0]
+      },
+      '00281050': {
+        'vr': 'DS',
+        'Value': [_primaryController.windowCenter.toStringAsFixed(0)]
+      },
+      '00281051': {
+        'vr': 'DS',
+        'Value': [_primaryController.windowWidth.toStringAsFixed(0)]
+      },
     };
   }
 
@@ -346,25 +425,42 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             final cachedState = _framePresentationCache[frameIdx];
             if (cachedState != null) {
               controller.applyPresentationState(cachedState, notify: false);
-              controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+              controller.setFrame(pixelFrame,
+                  updateWindowLevelFromFrame: false);
             } else {
               controller.resetZoomPan(notify: false);
-              final is8Bit = pixelFrame.bitsAllocated <= 8 || pixelFrame.rawPixels is Uint8List;
+              final is8Bit = pixelFrame.bitsAllocated <= 8 ||
+                  pixelFrame.rawPixels is Uint8List;
               if (is8Bit) {
                 controller.setWindowLevel(128.0, 256.0);
-                controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+                controller.setFrame(pixelFrame,
+                    updateWindowLevelFromFrame: false);
               } else {
                 final metaCenter = _loadedSeries!.frames.isNotEmpty
-                    ? _loadedSeries!.frames[frameIdx < _loadedSeries!.frames.length ? frameIdx : 0].metadata.windowCenter
+                    ? _loadedSeries!
+                        .frames[frameIdx < _loadedSeries!.frames.length
+                            ? frameIdx
+                            : 0]
+                        .metadata
+                        .windowCenter
                     : null;
                 final metaWidth = _loadedSeries!.frames.isNotEmpty
-                    ? _loadedSeries!.frames[frameIdx < _loadedSeries!.frames.length ? frameIdx : 0].metadata.windowWidth
+                    ? _loadedSeries!
+                        .frames[frameIdx < _loadedSeries!.frames.length
+                            ? frameIdx
+                            : 0]
+                        .metadata
+                        .windowWidth
                     : null;
-                if (metaCenter != null && metaWidth != null && metaWidth > 1.0) {
+                if (metaCenter != null &&
+                    metaWidth != null &&
+                    metaWidth > 1.0) {
                   controller.setWindowLevel(metaCenter, metaWidth);
-                  controller.setFrame(pixelFrame, updateWindowLevelFromFrame: false);
+                  controller.setFrame(pixelFrame,
+                      updateWindowLevelFromFrame: false);
                 } else {
-                  controller.setFrame(pixelFrame, updateWindowLevelFromFrame: true);
+                  controller.setFrame(pixelFrame,
+                      updateWindowLevelFromFrame: true);
                 }
               }
             }
@@ -372,7 +468,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             controller.updateMetadata(
               patientName: _loadedSeries!.study?.patientName ?? 'Anonymous',
               patientId: _loadedSeries!.study?.patientId ?? '-',
-              studyDescription: _loadedSeries!.study?.studyDescription ?? 'DICOM Study',
+              studyDescription:
+                  _loadedSeries!.study?.studyDescription ?? 'DICOM Study',
               seriesDescription: _loadedSeries!.series.seriesDescription,
               frameIndex: frameIdx + 1,
               totalFrames: totalCount,
@@ -400,12 +497,14 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.medical_services_outlined, color: Color(0xFF388BFD), size: 20),
+            Icon(Icons.medical_services_outlined,
+                color: Color(0xFF388BFD), size: 20),
             SizedBox(width: 10),
             Text('DICOM Flutter Radiology Kit'),
             SizedBox(width: 8),
             Chip(
-              label: Text('16-bit VOI LUT', style: TextStyle(fontSize: 10, color: Colors.white)),
+              label: Text('16-bit VOI LUT',
+                  style: TextStyle(fontSize: 10, color: Colors.white)),
               backgroundColor: Color(0xFF238636),
               padding: EdgeInsets.zero,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -416,7 +515,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           ElevatedButton.icon(
             onPressed: _openQidoBrowser,
             icon: const Icon(Icons.manage_search_rounded, size: 16),
-            label: const Text('QIDO Patient Browser', style: TextStyle(fontSize: 12)),
+            label: const Text('QIDO Patient Browser',
+                style: TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1F6FEB),
               foregroundColor: Colors.white,
@@ -431,10 +531,14 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             tooltip: 'Layout Grid ([1, 2, 4, 9] on 1)',
             onSelected: _setLayout,
             itemBuilder: (context) => [
-              _buildLayoutMenuItem(ViewportLayout.oneOnOne, Icons.crop_square_rounded),
-              _buildLayoutMenuItem(ViewportLayout.twoOnOne, Icons.view_agenda_rounded),
-              _buildLayoutMenuItem(ViewportLayout.fourOnOne, Icons.grid_view_rounded),
-              _buildLayoutMenuItem(ViewportLayout.nineOnOne, Icons.apps_rounded),
+              _buildLayoutMenuItem(
+                  ViewportLayout.oneOnOne, Icons.crop_square_rounded),
+              _buildLayoutMenuItem(
+                  ViewportLayout.twoOnOne, Icons.view_agenda_rounded),
+              _buildLayoutMenuItem(
+                  ViewportLayout.fourOnOne, Icons.grid_view_rounded),
+              _buildLayoutMenuItem(
+                  ViewportLayout.nineOnOne, Icons.apps_rounded),
             ],
           ),
 
@@ -446,12 +550,14 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           IconButton(
             icon: const Icon(Icons.zoom_in),
             tooltip: 'Zoom In Primary',
-            onPressed: () => _primaryController.setZoom(_primaryController.zoom + 0.25),
+            onPressed: () =>
+                _primaryController.setZoom(_primaryController.zoom + 0.25),
           ),
           IconButton(
             icon: const Icon(Icons.zoom_out),
             tooltip: 'Zoom Out Primary',
-            onPressed: () => _primaryController.setZoom(_primaryController.zoom - 0.25),
+            onPressed: () =>
+                _primaryController.setZoom(_primaryController.zoom - 0.25),
           ),
           IconButton(
             icon: const Icon(Icons.restart_alt),
@@ -476,9 +582,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: Icon(_sidebarExpanded ? Icons.view_sidebar : Icons.view_sidebar_outlined),
+            icon: Icon(_sidebarExpanded
+                ? Icons.view_sidebar
+                : Icons.view_sidebar_outlined),
             tooltip: 'Toggle Control Panel',
-            onPressed: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+            onPressed: () =>
+                setState(() => _sidebarExpanded = !_sidebarExpanded),
           ),
           const SizedBox(width: 12),
         ],
@@ -505,13 +614,18 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     );
   }
 
-  PopupMenuItem<ViewportLayout> _buildLayoutMenuItem(ViewportLayout layout, IconData icon) {
+  PopupMenuItem<ViewportLayout> _buildLayoutMenuItem(
+      ViewportLayout layout, IconData icon) {
     final isSelected = _layout == layout;
     return PopupMenuItem<ViewportLayout>(
       value: layout,
       child: Row(
         children: [
-          Icon(icon, size: 18, color: isSelected ? const Color(0xFF58A6FF) : const Color(0xFF8B949E)),
+          Icon(icon,
+              size: 18,
+              color: isSelected
+                  ? const Color(0xFF58A6FF)
+                  : const Color(0xFF8B949E)),
           const SizedBox(width: 10),
           Text(
             layout.label,
@@ -546,7 +660,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 showOverlay: _showOverlay,
               ),
             ),
-            const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+            const VerticalDivider(
+                width: 2, thickness: 2, color: Color(0xFF30363D)),
             Expanded(
               child: DicomViewport(
                 controller: _controllers[1],
@@ -568,7 +683,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                       showOverlay: _showOverlay,
                     ),
                   ),
-                  const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                  const VerticalDivider(
+                      width: 2, thickness: 2, color: Color(0xFF30363D)),
                   Expanded(
                     child: DicomViewport(
                       controller: _controllers[1],
@@ -588,7 +704,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                       showOverlay: _showOverlay,
                     ),
                   ),
-                  const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                  const VerticalDivider(
+                      width: 2, thickness: 2, color: Color(0xFF30363D)),
                   Expanded(
                     child: DicomViewport(
                       controller: _controllers[3],
@@ -607,7 +724,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             return Expanded(
               child: Column(
                 children: [
-                  if (row > 0) const Divider(height: 2, thickness: 2, color: Color(0xFF30363D)),
+                  if (row > 0)
+                    const Divider(
+                        height: 2, thickness: 2, color: Color(0xFF30363D)),
                   Expanded(
                     child: Row(
                       children: List.generate(3, (col) {
@@ -616,7 +735,10 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                           child: Row(
                             children: [
                               if (col > 0)
-                                const VerticalDivider(width: 2, thickness: 2, color: Color(0xFF30363D)),
+                                const VerticalDivider(
+                                    width: 2,
+                                    thickness: 2,
+                                    color: Color(0xFF30363D)),
                               Expanded(
                                 child: DicomViewport(
                                   controller: _controllers[slot],
@@ -651,16 +773,20 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _buildFixtureChip('CT Phantom', _selectedFixture == 'CT Phantom', _loadCtPhantom),
-                _buildFixtureChip('TG18-QC', _selectedFixture == 'TG18-QC Test Pattern', _loadTg18Qc),
-                _buildFixtureChip('Dynamic Ramp', _selectedFixture == 'Dynamic Ramp', _loadDynamicRamp),
+                _buildFixtureChip('CT Phantom',
+                    _selectedFixture == 'CT Phantom', _loadCtPhantom),
+                _buildFixtureChip('TG18-QC',
+                    _selectedFixture == 'TG18-QC Test Pattern', _loadTg18Qc),
+                _buildFixtureChip('Dynamic Ramp',
+                    _selectedFixture == 'Dynamic Ramp', _loadDynamicRamp),
               ],
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _openQidoBrowser,
               icon: const Icon(Icons.cloud_sync_outlined, size: 16),
-              label: const Text('QIDO Studies & Series Browser', style: TextStyle(fontSize: 12)),
+              label: const Text('QIDO Studies & Series Browser',
+                  style: TextStyle(fontSize: 12)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF58A6FF),
                 side: const BorderSide(color: Color(0xFF388BFD)),
@@ -670,12 +796,16 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               padding: const EdgeInsets.only(top: 6, bottom: 4),
               child: Row(
                 children: [
-                  const Icon(Icons.dns_outlined, size: 12, color: Color(0xFF58A6FF)),
+                  const Icon(Icons.dns_outlined,
+                      size: 12, color: Color(0xFF58A6FF)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Root: $_activeServerUrl',
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E), fontFamily: 'monospace'),
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFF8B949E),
+                          fontFamily: 'monospace'),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -691,7 +821,10 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 children: [
                   Text(
                     'Base Frame ${_currentFrameIndex + 1} / ${_loadedSeries!.frameCount}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF58A6FF)),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF58A6FF)),
                   ),
                   if (_isLoadingFrame)
                     const SizedBox(
@@ -705,7 +838,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 value: _currentFrameIndex.toDouble(),
                 min: 0.0,
                 max: (_loadedSeries!.frameCount - 1).toDouble(),
-                divisions: _loadedSeries!.frameCount > 1 ? _loadedSeries!.frameCount - 1 : 1,
+                divisions: _loadedSeries!.frameCount > 1
+                    ? _loadedSeries!.frameCount - 1
+                    : 1,
                 onChanged: (val) => _goToFrame(val.round()),
               ),
               Row(
@@ -713,26 +848,31 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.skip_previous, size: 20),
-                    onPressed: _currentFrameIndex > 0 ? () => _goToFrame(0) : null,
+                    onPressed:
+                        _currentFrameIndex > 0 ? () => _goToFrame(0) : null,
                     tooltip: 'First Slice',
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_left, size: 20),
-                    onPressed: _currentFrameIndex > 0 ? () => _goToFrame(_currentFrameIndex - 1) : null,
+                    onPressed: _currentFrameIndex > 0
+                        ? () => _goToFrame(_currentFrameIndex - 1)
+                        : null,
                     tooltip: 'Previous Slice',
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right, size: 20),
-                    onPressed: _currentFrameIndex < _loadedSeries!.frameCount - 1
-                        ? () => _goToFrame(_currentFrameIndex + 1)
-                        : null,
+                    onPressed:
+                        _currentFrameIndex < _loadedSeries!.frameCount - 1
+                            ? () => _goToFrame(_currentFrameIndex + 1)
+                            : null,
                     tooltip: 'Next Slice',
                   ),
                   IconButton(
                     icon: const Icon(Icons.skip_next, size: 20),
-                    onPressed: _currentFrameIndex < _loadedSeries!.frameCount - 1
-                        ? () => _goToFrame(_loadedSeries!.frameCount - 1)
-                        : null,
+                    onPressed:
+                        _currentFrameIndex < _loadedSeries!.frameCount - 1
+                            ? () => _goToFrame(_loadedSeries!.frameCount - 1)
+                            : null,
                     tooltip: 'Last Slice',
                   ),
                 ],
@@ -748,7 +888,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               children: ViewportLayout.values.map((layout) {
                 final isSelected = _layout == layout;
                 return ChoiceChip(
-                  label: Text(layout.label, style: const TextStyle(fontSize: 11)),
+                  label:
+                      Text(layout.label, style: const TextStyle(fontSize: 11)),
                   selected: isSelected,
                   onSelected: (selected) {
                     if (selected) _setLayout(layout);
@@ -772,7 +913,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               children: WindowPresets.all.map((preset) {
                 final isSelected = _primaryController.activePreset == preset;
                 return ChoiceChip(
-                  label: Text(preset.name, style: const TextStyle(fontSize: 11)),
+                  label:
+                      Text(preset.name, style: const TextStyle(fontSize: 11)),
                   selected: isSelected,
                   onSelected: (selected) {
                     if (selected) _primaryController.applyPreset(preset);
@@ -793,9 +935,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Center (C):', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('Center (C):',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 Text('${_primaryController.windowCenter.toStringAsFixed(1)} HU',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
             Slider(
@@ -803,15 +947,18 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               min: -1000.0,
               max: 3000.0,
               onChanged: (val) {
-                _primaryController.setWindowLevel(val, _primaryController.windowWidth);
+                _primaryController.setWindowLevel(
+                    val, _primaryController.windowWidth);
               },
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Width (W):', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                const Text('Width (W):',
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
                 Text('${_primaryController.windowWidth.toStringAsFixed(1)} HU',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
             Slider(
@@ -819,7 +966,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               min: 1.0,
               max: 4000.0,
               onChanged: (val) {
-                _primaryController.setWindowLevel(_primaryController.windowCenter, val);
+                _primaryController.setWindowLevel(
+                    _primaryController.windowCenter, val);
               },
             ),
 
@@ -827,7 +975,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
             // Zoom & Transform Inspector
             _buildSectionHeader('PRIMARY VIEWPORT TRANSFORM'),
-            _buildInfoRow('Zoom Scale', '${(_primaryController.zoom * 100).toStringAsFixed(0)}%'),
+            _buildInfoRow('Zoom Scale',
+                '${(_primaryController.zoom * 100).toStringAsFixed(0)}%'),
             _buildInfoRow('Pan Offset',
                 '(${_primaryController.panOffset.dx.toStringAsFixed(1)}, ${_primaryController.panOffset.dy.toStringAsFixed(1)})'),
 
@@ -840,11 +989,13 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
               _buildInfoRow('Photometric', frame.photometricInterpretation),
               _buildInfoRow('Bits Allocated', '${frame.bitsAllocated}'),
               _buildInfoRow('Bits Stored', '${frame.bitsStored}'),
-              _buildInfoRow('Pixel Representation', frame.isSigned ? 'Signed (Int16)' : 'Unsigned (Uint16)'),
+              _buildInfoRow('Pixel Representation',
+                  frame.isSigned ? 'Signed (Int16)' : 'Unsigned (Uint16)'),
               _buildInfoRow('Rescale Slope', '${frame.rescaleSlope}'),
               _buildInfoRow('Rescale Intercept', '${frame.rescaleIntercept}'),
             ] else
-              const Text('No active frame loaded', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text('No active frame loaded',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         );
       },
@@ -866,14 +1017,16 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     );
   }
 
-  Widget _buildFixtureChip(String title, bool isSelected, VoidCallback onSelected) {
+  Widget _buildFixtureChip(
+      String title, bool isSelected, VoidCallback onSelected) {
     return FilterChip(
       label: Text(title, style: const TextStyle(fontSize: 11)),
       selected: isSelected,
       onSelected: (_) => onSelected(),
       selectedColor: const Color(0xFF238636),
       backgroundColor: const Color(0xFF21262D),
-      labelStyle: TextStyle(color: isSelected ? Colors.white : const Color(0xFFC9D1D9)),
+      labelStyle:
+          TextStyle(color: isSelected ? Colors.white : const Color(0xFFC9D1D9)),
     );
   }
 
@@ -883,8 +1036,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
-          Text(value, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.white)),
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF8B949E))),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 11, fontFamily: 'monospace', color: Colors.white)),
         ],
       ),
     );

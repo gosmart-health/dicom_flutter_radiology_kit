@@ -189,7 +189,8 @@ class WasmWorkerBridge implements FrameDecoder {
       } catch (_) {}
 
       // If no requests were in flight and we have candidates left, try next candidate
-      if (_pendingRequests.isEmpty && _candidateIndex < _workerCandidates.length) {
+      if (_pendingRequests.isEmpty &&
+          _candidateIndex < _workerCandidates.length) {
         _tryStartNextWorker();
         return;
       }
@@ -205,14 +206,16 @@ class WasmWorkerBridge implements FrameDecoder {
   }
 
   @override
-  Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeFrame(
+      Uint8List encodedBytes, DecodeOptions options) async {
     _ensureWorker();
 
     if (_worker != null && !_workerFailed) {
       try {
         return await _decodeViaWorker(encodedBytes, options, 'decode');
       } catch (e) {
-        print('[DICOM-BRIDGE] Worker J2K decode failed: $e. Attempting in-window fallback...');
+        print(
+            '[DICOM-BRIDGE] Worker J2K decode failed: $e. Attempting in-window fallback...');
       }
     }
 
@@ -220,14 +223,16 @@ class WasmWorkerBridge implements FrameDecoder {
   }
 
   /// Offload JPEG Baseline to Web Worker using OffscreenCanvas, or fallback to in-window.
-  Future<DecodeResult> decodeJpeg(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeJpeg(
+      Uint8List encodedBytes, DecodeOptions options) async {
     _ensureWorker();
 
     if (_worker != null && !_workerFailed) {
       try {
         return await _decodeViaWorker(encodedBytes, options, 'decodeJpeg');
       } catch (e) {
-        print('[DICOM-BRIDGE] Worker JPEG decode failed: $e. Attempting in-window fallback...');
+        print(
+            '[DICOM-BRIDGE] Worker JPEG decode failed: $e. Attempting in-window fallback...');
       }
     }
 
@@ -235,14 +240,16 @@ class WasmWorkerBridge implements FrameDecoder {
   }
 
   /// Offload RLE PackBits decoding to Web Worker thread, with zero-allocation fallback.
-  Future<DecodeResult> decodeRle(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeRle(
+      Uint8List encodedBytes, DecodeOptions options) async {
     _ensureWorker();
 
     if (_worker != null && !_workerFailed) {
       try {
         return await _decodeViaWorker(encodedBytes, options, 'decodeRle');
       } catch (e) {
-        print('[DICOM-BRIDGE] Worker RLE decode failed: $e. Using in-Dart fallback...');
+        print(
+            '[DICOM-BRIDGE] Worker RLE decode failed: $e. Using in-Dart fallback...');
       }
     }
 
@@ -276,20 +283,23 @@ class WasmWorkerBridge implements FrameDecoder {
         const Duration(seconds: 8),
         onTimeout: () {
           _pendingRequests.remove(id);
-          throw TimeoutException('Web Worker decode timed out for request #$id ($command, ${encodedBytes.length} bytes)');
+          throw TimeoutException(
+              'Web Worker decode timed out for request #$id ($command, ${encodedBytes.length} bytes)');
         },
       );
       sw.stop();
       return result;
     } catch (e) {
       sw.stop();
-      print('[DICOM-BRIDGE] WARNING: Worker request #$id ($command) failed after ${sw.elapsedMilliseconds}ms: $e');
+      print(
+          '[DICOM-BRIDGE] WARNING: Worker request #$id ($command) failed after ${sw.elapsedMilliseconds}ms: $e');
       rethrow;
     }
   }
 
   static bool get _hasWindowDecodeJpeg2000 =>
-      (web.window as JSObject).getProperty<JSAny?>('decodeJpeg2000'.toJS) != null;
+      (web.window as JSObject).getProperty<JSAny?>('decodeJpeg2000'.toJS) !=
+      null;
 
   static Future<void> _ensureWindowScriptsLoaded() async {
     if (_hasWindowDecodeJpeg2000) return;
@@ -303,7 +313,8 @@ class WasmWorkerBridge implements FrameDecoder {
     for (final url in candidateUrls) {
       try {
         final completer = Completer<void>();
-        final script = web.document.createElement('script') as web.HTMLScriptElement;
+        final script =
+            web.document.createElement('script') as web.HTMLScriptElement;
         script.src = url;
         script.onload = ((web.Event _) {
           completer.complete();
@@ -322,11 +333,13 @@ class WasmWorkerBridge implements FrameDecoder {
     }
   }
 
-  Future<DecodeResult> _decodeViaWindow(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> _decodeViaWindow(
+      Uint8List encodedBytes, DecodeOptions options) async {
     try {
       await _ensureWindowScriptsLoaded();
       if (!_hasWindowDecodeJpeg2000) {
-        throw Exception('OpenJPEG WASM decoding unavailable: decodeJpeg2000 not found on window');
+        throw Exception(
+            'OpenJPEG WASM decoding unavailable: decodeJpeg2000 not found on window');
       }
 
       final promise = decodeJpeg2000Js(
@@ -347,14 +360,16 @@ class WasmWorkerBridge implements FrameDecoder {
       if (jsResult.pixelData16 != null) {
         final dart16 = jsResult.pixelData16!.toDart;
         if (isSigned) {
-          pixels = dart16.buffer.asInt16List(dart16.offsetInBytes, dart16.length);
+          pixels =
+              dart16.buffer.asInt16List(dart16.offsetInBytes, dart16.length);
         } else {
           pixels = dart16;
         }
       } else if (jsResult.pixelData8 != null) {
         pixels = jsResult.pixelData8!.toDart;
       } else {
-        pixels = isSigned ? Int16List(width * height) : Uint16List(width * height);
+        pixels =
+            isSigned ? Int16List(width * height) : Uint16List(width * height);
       }
 
       return DecodeResult(
@@ -370,7 +385,8 @@ class WasmWorkerBridge implements FrameDecoder {
     }
   }
 
-  Future<DecodeResult> _decodeJpegViaWindow(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> _decodeJpegViaWindow(
+      Uint8List encodedBytes, DecodeOptions options) async {
     try {
       final promise = decodeJpegBaselineJs(
         encodedBytes.toJS,
@@ -427,7 +443,8 @@ class WasmWorkerBridge implements FrameDecoder {
       final end = (s + 1 < numSegments) ? segmentOffsets[s + 1] : bytes.length;
       if (start >= bytes.length) break;
 
-      final segData = _unpackPackBitsFast(bytes, start, end.clamp(start, bytes.length), numPixels);
+      final segData = _unpackPackBitsFast(
+          bytes, start, end.clamp(start, bytes.length), numPixels);
       decompressedSegments.add(segData);
     }
 
@@ -470,7 +487,8 @@ class WasmWorkerBridge implements FrameDecoder {
     );
   }
 
-  static Uint8List _unpackPackBitsFast(Uint8List input, int start, int end, int expectedSize) {
+  static Uint8List _unpackPackBitsFast(
+      Uint8List input, int start, int end, int expectedSize) {
     final output = Uint8List(expectedSize);
     int inIdx = start;
     int outIdx = 0;
@@ -506,13 +524,15 @@ class WasmWorkerBridge implements FrameDecoder {
     return output;
   }
 
-  static DecodeResult _decodeUncompressedInDart(Uint8List bytes, DecodeOptions options) {
+  static DecodeResult _decodeUncompressedInDart(
+      Uint8List bytes, DecodeOptions options) {
     final numPixels = options.width * options.height;
     final TypedData pixels;
 
     if (options.bitsAllocated == 16) {
       if (options.isSigned) {
-        if (bytes.offsetInBytes % 2 == 0 && bytes.lengthInBytes >= numPixels * 2) {
+        if (bytes.offsetInBytes % 2 == 0 &&
+            bytes.lengthInBytes >= numPixels * 2) {
           pixels = Int16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
         } else {
           final list = Int16List(numPixels);
@@ -524,8 +544,10 @@ class WasmWorkerBridge implements FrameDecoder {
           pixels = list;
         }
       } else {
-        if (bytes.offsetInBytes % 2 == 0 && bytes.lengthInBytes >= numPixels * 2) {
-          pixels = Uint16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
+        if (bytes.offsetInBytes % 2 == 0 &&
+            bytes.lengthInBytes >= numPixels * 2) {
+          pixels =
+              Uint16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
         } else {
           final list = Uint16List(numPixels);
           final bd = ByteData.sublistView(bytes);
