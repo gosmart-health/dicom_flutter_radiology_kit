@@ -11,4 +11,3 @@ class FileExporter {
     return 'Copied $filename content (${content.length} bytes) to clipboard.';
   }
 }
-

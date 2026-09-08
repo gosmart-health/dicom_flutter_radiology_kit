@@ -40,5 +40,6 @@ class DecodeResult {
 
 /// Abstract contract for frame decoders.
 abstract class FrameDecoder {
-  Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options);
+  Future<DecodeResult> decodeFrame(
+      Uint8List encodedBytes, DecodeOptions options);
 }

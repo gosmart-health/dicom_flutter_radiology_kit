@@ -42,7 +42,8 @@ class DicomFrameBuffer {
 
   /// Decodes this frame into a [PixelFrame] preserving 16-bit scalar pixel buffers.
   Future<PixelFrame> toPixelFrame() async {
-    final transferSyntax = metadata.transferSyntaxUID ?? DicomTransferSyntaxes.explicitVRLittleEndian;
+    final transferSyntax = metadata.transferSyntaxUID ??
+        DicomTransferSyntaxes.explicitVRLittleEndian;
     final options = DecodeOptions(
       width: metadata.columns,
       height: metadata.rows,
@@ -104,7 +105,8 @@ class DicomSeriesBuffer {
 
   /// Whether all expected instances in this series have been received.
   bool get isComplete =>
-      _isCompleteExplicit || (totalExpectedInstances > 0 && frames.length >= totalExpectedInstances);
+      _isCompleteExplicit ||
+      (totalExpectedInstances > 0 && frames.length >= totalExpectedInstances);
 
   set isComplete(bool value) {
     _isCompleteExplicit = value;

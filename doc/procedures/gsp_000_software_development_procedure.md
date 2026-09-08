@@ -17,7 +17,7 @@ This procedure applies to:
 - Core library code in `lib/` (client streaming, WASM codecs, scalar imaging, Flutter viewports).
 - Web Worker and WebAssembly modules in `web/` (OpenJPEG/OpenJPH builds).
 - Automated test suites and verification scripts in `test/`.
-- Design Controls and Traceability documentation in `docs/design/`.
+- Design Controls and Traceability documentation in `doc/design/`.
 
 ---
 
@@ -27,12 +27,12 @@ In accordance with **IEC 62304 Clause 4.3**, `dicom_flutter_radiology_kit` is ca
 - **Definition:** No injury or non-serious injury is possible from direct software failure; however, software outputs may inform medical diagnoses when integrated into a downstream medical device system.
 - **Required Lifecycle Deliverables for Class B:**
   1. Software Development Plan & Procedures (this document).
-  2. Software Requirements Specification (`docs/design/gsd_000_software_requirements_spec.md`).
-  3. System & Detailed Design Specification (`docs/design/gsd_010_system_design_specification.md`).
-  4. Hazard Analysis & Risk Management Plan (`docs/design/gsd_020_hazard_analysis_risk_management.md`).
-  5. Verification & Validation Protocol (`docs/design/gsd_030_verification_and_validation_plan.md`).
-  6. Requirements Traceability Matrix (`docs/design/gsd_040_traceability_matrix.md`).
-  7. Cybersecurity & SOUP Management Plan (`docs/design/gsd_050_cybersecurity_and_soup_bom.md`).
+  2. Software Requirements Specification (`doc/design/gsd_000_software_requirements_spec.md`).
+  3. System & Detailed Design Specification (`doc/design/gsd_010_system_design_specification.md`).
+  4. Hazard Analysis & Risk Management Plan (`doc/design/gsd_020_hazard_analysis_risk_management.md`).
+  5. Verification & Validation Protocol (`doc/design/gsd_030_verification_and_validation_plan.md`).
+  6. Requirements Traceability Matrix (`doc/design/gsd_040_traceability_matrix.md`).
+  7. Cybersecurity & SOUP Management Plan (`doc/design/gsd_050_cybersecurity_and_soup_bom.md`).
 
 ---
 
@@ -93,7 +93,7 @@ flowchart TD
 ## 5. Software of Unknown Provenance (SOUP) Management (IEC 62304 Cl. 5.3.3)
 
 1. Third-party packages and compiled binaries (such as `OpenJPEG WASM`, `package:web`, `http`) are classified as SOUP.
-2. All SOUP components are cataloged in `docs/design/gsd_050_cybersecurity_and_soup_bom.md` with:
+2. All SOUP components are cataloged in `doc/design/gsd_050_cybersecurity_and_soup_bom.md` with:
    - SOUP Title and Version.
    - Intended clinical/functional role.
    - Known vulnerabilities and monitoring mechanisms (CVE alerts, Dependabot).

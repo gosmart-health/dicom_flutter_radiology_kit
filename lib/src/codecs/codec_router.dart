@@ -71,12 +71,18 @@ class CodecRouter {
     required DecodeOptions options,
   }) async {
     // 1. Check magic bytes first (most reliable detection)
-    if (frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0xD8) {
+    if (frameBytes.length >= 2 &&
+        frameBytes[0] == 0xFF &&
+        frameBytes[1] == 0xD8) {
       return await _decodeJpegBaseline(frameBytes, options);
     }
 
-    if ((frameBytes.length >= 2 && frameBytes[0] == 0xFF && frameBytes[1] == 0x4F) ||
-        (frameBytes.length >= 12 && frameBytes[4] == 0x6A && frameBytes[5] == 0x50)) {
+    if ((frameBytes.length >= 2 &&
+            frameBytes[0] == 0xFF &&
+            frameBytes[1] == 0x4F) ||
+        (frameBytes.length >= 12 &&
+            frameBytes[4] == 0x6A &&
+            frameBytes[5] == 0x50)) {
       return await _wasmWorkerBridge.decodeFrame(frameBytes, options);
     }
 
@@ -111,7 +117,8 @@ class CodecRouter {
       final codec = await ui.instantiateImageCodec(bytes);
       final frameInfo = await codec.getNextFrame();
       final image = frameInfo.image;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
       final width = image.width;
       final height = image.height;
@@ -144,13 +151,15 @@ class CodecRouter {
     return await _wasmWorkerBridge.decodeJpeg(bytes, options);
   }
 
-  static DecodeResult _decodeUncompressed(Uint8List bytes, DecodeOptions options) {
+  static DecodeResult _decodeUncompressed(
+      Uint8List bytes, DecodeOptions options) {
     final numPixels = options.width * options.height;
     final TypedData pixels;
 
     if (options.bitsAllocated == 16) {
       if (options.isSigned) {
-        if (bytes.offsetInBytes % 2 == 0 && bytes.lengthInBytes >= numPixels * 2) {
+        if (bytes.offsetInBytes % 2 == 0 &&
+            bytes.lengthInBytes >= numPixels * 2) {
           pixels = Int16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
         } else {
           final list = Int16List(numPixels);
@@ -162,8 +171,10 @@ class CodecRouter {
           pixels = list;
         }
       } else {
-        if (bytes.offsetInBytes % 2 == 0 && bytes.lengthInBytes >= numPixels * 2) {
-          pixels = Uint16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
+        if (bytes.offsetInBytes % 2 == 0 &&
+            bytes.lengthInBytes >= numPixels * 2) {
+          pixels =
+              Uint16List.view(bytes.buffer, bytes.offsetInBytes, numPixels);
         } else {
           final list = Uint16List(numPixels);
           final bd = ByteData.sublistView(bytes);
@@ -198,7 +209,8 @@ class CodecRouter {
   }
 
   /// DICOM Part 5 Annex G RLE Decompressor offloaded to Web Worker / background isolate.
-  static Future<DecodeResult> _decodeRle(Uint8List bytes, DecodeOptions options) async {
+  static Future<DecodeResult> _decodeRle(
+      Uint8List bytes, DecodeOptions options) async {
     try {
       return await _wasmWorkerBridge.decodeRle(bytes, options);
     } catch (_) {}

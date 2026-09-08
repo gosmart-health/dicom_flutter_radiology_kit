@@ -55,7 +55,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   /// Restores viewport parameters from a [DicomPresentationState].
-  void applyPresentationState(DicomPresentationState state, {bool notify = true}) {
+  void applyPresentationState(DicomPresentationState state,
+      {bool notify = true}) {
     _windowCenter = state.windowCenter;
     _windowWidth = state.windowWidth < 1.0 ? 1.0 : state.windowWidth;
     _zoom = state.zoom.clamp(0.1, 20.0);
@@ -206,7 +207,8 @@ class ViewportController extends ChangeNotifier {
   }
 
   /// Whether zoom or pan has been customized away from default auto-fit / zero-pan.
-  bool get isZoomPanModified => (_zoom - 1.0).abs() > 0.001 || _panOffset != Offset.zero;
+  bool get isZoomPanModified =>
+      (_zoom - 1.0).abs() > 0.001 || _panOffset != Offset.zero;
 
   /// Resets zoom to 1.0 (auto-fit) and panOffset to Offset.zero.
   void resetZoomPan({bool notify = true}) {

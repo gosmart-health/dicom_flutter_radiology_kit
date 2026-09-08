@@ -86,25 +86,25 @@ class _MedicalViewerPageState extends State<MedicalViewerPage> {
 ## Document Walkthrough (Regulatory & Quality System)
 
 To minimize regulatory friction for downstream medical device integrators seeking FDA 510(k) clearance or CE Mark (IEC 62304 / ISO 14971 / ISO 13485 compliance), `dicom_flutter_radiology_kit` provides formal documentation suites categorized by prefix:
-- **`gsd_XXX` (`d` for Design Controls)** under [`docs/design/`](./docs/design/)
-- **`gsp_XXX` (`p` for Procedures / SOPs)** under [`docs/procedures/`](./docs/procedures/)
+- **`gsd_XXX` (`d` for Design Controls)** under [`doc/design/`](./doc/design/)
+- **`gsp_XXX` (`p` for Procedures / SOPs)** under [`doc/procedures/`](./doc/procedures/)
 
 ### Design Controls (`gsd_XXX`)
 
 | Document | Regulatory Standard | Description |
 | :--- | :--- | :--- |
-| **[gsd_000: Software Requirements Specification](./docs/design/gsd_000_software_requirements_spec.md)** | IEC 62304 Cl. 5.2 | Functional specifications, DICOM Transfer Syntaxes, 16-bit scalar preservation, performance benchmarks, and NEMA PS3.14 GSDF display rules. |
-| **[gsd_010: System Design Specification](./docs/design/gsd_010_system_design_specification.md)** | IEC 62304 Cl. 5.3 / 5.4 | Software Architecture Description (SAD), subsystem decomposition (`client`, `codecs`, `imaging`, `widgets`), Web Worker thread boundaries, and VOI LUT equations. |
-| **[gsd_020: Hazard Analysis & Risk Management](./docs/design/gsd_020_hazard_analysis_risk_management.md)** | ISO 14971:2019 / IEC 62304 Cl. 7 | Software Hazard Analysis Matrix identifying clinical hazards (detail loss, MONOCHROME1 inversion, WASM crashes) and software design risk controls. |
-| **[gsd_030: Verification & Validation Plan](./docs/design/gsd_030_verification_and_validation_plan.md)** | IEC 62304 Cl. 5.5 - 5.7 | Verification test protocols across unit tests, browser Web Worker interop, and TG18 / SMPTE visual rendering accuracy validation. |
-| **[gsd_040: Traceability Matrix](./docs/design/gsd_040_traceability_matrix.md)** | FDA Design Controls | Bi-directional matrix mapping **Requirements (SRS) <-> System Design (SDS) <-> Hazards (ISO 14971) <-> Verification Tests (V&V)**. |
-| **[gsd_050: Cybersecurity & SOUP BOM](./docs/design/gsd_050_cybersecurity_and_soup_bom.md)** | FDA Cybersecurity Guidance | Software Bill of Materials (SBOM) for SOUP components (OpenJPEG WASM, Dart SDK, `package:web`), threat modeling, and PHI privacy rules. |
+| **[gsd_000: Software Requirements Specification](./doc/design/gsd_000_software_requirements_spec.md)** | IEC 62304 Cl. 5.2 | Functional specifications, DICOM Transfer Syntaxes, 16-bit scalar preservation, performance benchmarks, and NEMA PS3.14 GSDF display rules. |
+| **[gsd_010: System Design Specification](./doc/design/gsd_010_system_design_specification.md)** | IEC 62304 Cl. 5.3 / 5.4 | Software Architecture Description (SAD), subsystem decomposition (`client`, `codecs`, `imaging`, `widgets`), Web Worker thread boundaries, and VOI LUT equations. |
+| **[gsd_020: Hazard Analysis & Risk Management](./doc/design/gsd_020_hazard_analysis_risk_management.md)** | ISO 14971:2019 / IEC 62304 Cl. 7 | Software Hazard Analysis Matrix identifying clinical hazards (detail loss, MONOCHROME1 inversion, WASM crashes) and software design risk controls. |
+| **[gsd_030: Verification & Validation Plan](./doc/design/gsd_030_verification_and_validation_plan.md)** | IEC 62304 Cl. 5.5 - 5.7 | Verification test protocols across unit tests, browser Web Worker interop, and TG18 / SMPTE visual rendering accuracy validation. |
+| **[gsd_040: Traceability Matrix](./doc/design/gsd_040_traceability_matrix.md)** | FDA Design Controls | Bi-directional matrix mapping **Requirements (SRS) <-> System Design (SDS) <-> Hazards (ISO 14971) <-> Verification Tests (V&V)**. |
+| **[gsd_050: Cybersecurity & SOUP BOM](./doc/design/gsd_050_cybersecurity_and_soup_bom.md)** | FDA Cybersecurity Guidance | Software Bill of Materials (SBOM) for SOUP components (OpenJPEG WASM, Dart SDK, `package:web`), threat modeling, and PHI privacy rules. |
 
 ### Standard Operating Procedures (`gsp_XXX`)
 
 | Document | Regulatory Standard | Description |
 | :--- | :--- | :--- |
-| **[gsp_000: Software Development Procedure](./docs/procedures/gsp_000_software_development_procedure.md)** | IEC 62304 Cl. 5 / ISO 13485 Cl. 7.3 | Standard Operating Procedure defining Safety Class B lifecycle phases, unit/integration verification, ISO 14971 risk controls, and release criteria. |
+| **[gsp_000: Software Development Procedure](./doc/procedures/gsp_000_software_development_procedure.md)** | IEC 62304 Cl. 5 / ISO 13485 Cl. 7.3 | Standard Operating Procedure defining Safety Class B lifecycle phases, unit/integration verification, ISO 14971 risk controls, and release criteria. |
 
 ---
 
@@ -115,8 +115,8 @@ To minimize regulatory friction for downstream medical device integrators seekin
 - `lib/src/imaging/`: 16-bit `PixelFrame`, dynamic `VoiLut` pipeline, and `WindowPresets`.
 - `lib/src/widgets/`: Flutter `DicomViewport`, `ViewportController`, and HUD `Overlays`.
 - `web/`: `j2k_worker.js`, `openjpegwasm.js`, and `openjpegwasm.wasm`.
-- `docs/design/`: Design Controls & 510(k) compliance documentation suite.
-- `docs/procedures/`: Standard Operating Procedures (SOPs) for medical device software development lifecycle.
+- `doc/design/`: Design Controls & 510(k) compliance documentation suite.
+- `doc/procedures/`: Standard Operating Procedures (SOPs) for medical device software development lifecycle.
 
 ---
 

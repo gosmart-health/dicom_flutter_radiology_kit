@@ -83,17 +83,21 @@ class VoiLut {
       } else if (modVal > maxWin) {
         displayVal = 255;
       } else {
-        displayVal = (((modVal - (centerFromMinWin(minWin, width))) / width + 0.5) * 255.0).round().clamp(0, 255);
+        displayVal =
+            (((modVal - (centerFromMinWin(minWin, width))) / width + 0.5) *
+                    255.0)
+                .round()
+                .clamp(0, 255);
       }
 
       if (isMonochrome1) {
         displayVal = 255 - displayVal;
       }
 
-      dest[destIdx] = displayVal;     // R
+      dest[destIdx] = displayVal; // R
       dest[destIdx + 1] = displayVal; // G
       dest[destIdx + 2] = displayVal; // B
-      dest[destIdx + 3] = 255;        // A
+      dest[destIdx + 3] = 255; // A
       destIdx += 4;
     }
   }
@@ -118,7 +122,8 @@ class VoiLut {
       } else if (modVal > maxWin) {
         displayVal = 255;
       } else {
-        displayVal = (((modVal - minWin) / width) * 255.0).round().clamp(0, 255);
+        displayVal =
+            (((modVal - minWin) / width) * 255.0).round().clamp(0, 255);
       }
 
       if (isMonochrome1) {
@@ -153,7 +158,8 @@ class VoiLut {
       } else if (modVal > maxWin) {
         displayVal = 255;
       } else {
-        displayVal = (((modVal - minWin) / width) * 255.0).round().clamp(0, 255);
+        displayVal =
+            (((modVal - minWin) / width) * 255.0).round().clamp(0, 255);
       }
 
       if (isMonochrome1) {

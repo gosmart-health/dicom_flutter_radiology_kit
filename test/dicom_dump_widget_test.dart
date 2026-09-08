@@ -30,7 +30,8 @@ void main() {
   };
 
   group('DicomDumpWidget Tests', () {
-    testWidgets('Renders empty state when metadata is null or empty', (tester) async {
+    testWidgets('Renders empty state when metadata is null or empty',
+        (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -39,10 +40,12 @@ void main() {
         ),
       );
 
-      expect(find.text('No DICOM metadata available for this frame.'), findsOneWidget);
+      expect(find.text('No DICOM metadata available for this frame.'),
+          findsOneWidget);
     });
 
-    testWidgets('Renders header columns and metadata rows in flat grid', (tester) async {
+    testWidgets('Renders header columns and metadata rows in flat grid',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -135,7 +138,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('No DICOM metadata available for this frame.'), findsOneWidget);
+      expect(find.text('No DICOM metadata available for this frame.'),
+          findsOneWidget);
 
       // Emit new metadata
       streamController.add(sampleMetadata);
@@ -147,7 +151,9 @@ void main() {
       await streamController.close();
     });
 
-    testWidgets('DicomDumpDialog.show displays modal and dismisses on click outside', (tester) async {
+    testWidgets(
+        'DicomDumpDialog.show displays modal and dismisses on click outside',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());

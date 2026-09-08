@@ -58,13 +58,16 @@ class DicomJsonHelper {
     if (item is Map<String, dynamic>) {
       final value = item['Value'];
       if (value is List) {
-        return value.map((e) {
-          if (e is String) return e;
-          if (e is Map<String, dynamic> && e.containsKey('Alphabetic')) {
-            return e['Alphabetic']?.toString() ?? '';
-          }
-          return e?.toString() ?? '';
-        }).where((s) => s.isNotEmpty).toList();
+        return value
+            .map((e) {
+              if (e is String) return e;
+              if (e is Map<String, dynamic> && e.containsKey('Alphabetic')) {
+                return e['Alphabetic']?.toString() ?? '';
+              }
+              return e?.toString() ?? '';
+            })
+            .where((s) => s.isNotEmpty)
+            .toList();
       }
     }
     return [];
@@ -84,7 +87,8 @@ class DicomJsonHelper {
     final nameParts = [first, middle].where((p) => p.isNotEmpty).join(' ');
     if (last.isEmpty && nameParts.isEmpty) return 'Anonymous';
     if (nameParts.isEmpty) return suffix.isNotEmpty ? '$last $suffix' : last;
-    if (last.isEmpty) return suffix.isNotEmpty ? '$nameParts $suffix' : nameParts;
+    if (last.isEmpty)
+      return suffix.isNotEmpty ? '$nameParts $suffix' : nameParts;
 
     final base = '$last, $nameParts';
     return suffix.isNotEmpty ? '$base $suffix' : base;
@@ -166,14 +170,16 @@ class DicomStudy {
     final accessionNumber = DicomJsonHelper.getString(json, '00080050') ?? '-';
     final studyDate = DicomJsonHelper.getString(json, '00080020') ?? '';
     final studyTime = DicomJsonHelper.getString(json, '00080030') ?? '';
-    final studyDateTimeIso = DicomJsonHelper.formatIsoDateTime(studyDate, studyTime);
+    final studyDateTimeIso =
+        DicomJsonHelper.formatIsoDateTime(studyDate, studyTime);
 
     final modalitiesInStudy = DicomJsonHelper.getStringList(json, '00080061');
     final singleModality = DicomJsonHelper.getString(json, '00080060');
     final modalities = modalitiesInStudy.isNotEmpty
         ? modalitiesInStudy
         : (singleModality != null ? [singleModality] : <String>[]);
-    final modality = modalities.isNotEmpty ? modalities.join('/') : (singleModality ?? 'OT');
+    final modality =
+        modalities.isNotEmpty ? modalities.join('/') : (singleModality ?? 'OT');
 
     final studyDescription = DicomJsonHelper.getString(json, '00081030') ?? '-';
     final numberOfSeries = DicomJsonHelper.getInt(json, '00201206') ?? 1;
@@ -226,7 +232,8 @@ class DicomSeries {
     final studyInstanceUID = DicomJsonHelper.getString(json, '0020000D') ?? '';
     final modality = DicomJsonHelper.getString(json, '00080060') ?? 'OT';
     final seriesNumber = DicomJsonHelper.getInt(json, '00200011') ?? 1;
-    final seriesDescription = DicomJsonHelper.getString(json, '0008103E') ?? 'Series $seriesNumber';
+    final seriesDescription =
+        DicomJsonHelper.getString(json, '0008103E') ?? 'Series $seriesNumber';
     final numberOfInstances = DicomJsonHelper.getInt(json, '00201209') ?? 0;
     final rawPhysician = DicomJsonHelper.getString(json, '00081050');
     final performingPhysician = DicomJsonHelper.formatPersonName(rawPhysician);
@@ -298,7 +305,8 @@ class DicomInstanceSummary {
     final rescaleIntercept = DicomJsonHelper.getDouble(json, '00281052') ?? 0.0;
     final windowCenter = DicomJsonHelper.getDouble(json, '00281050');
     final windowWidth = DicomJsonHelper.getDouble(json, '00281051');
-    final photometricInterpretation = DicomJsonHelper.getString(json, '00280004') ?? 'MONOCHROME2';
+    final photometricInterpretation =
+        DicomJsonHelper.getString(json, '00280004') ?? 'MONOCHROME2';
     final transferSyntaxUID = DicomJsonHelper.getString(json, '00020010');
 
     return DicomInstanceSummary(
@@ -321,4 +329,3 @@ class DicomInstanceSummary {
     );
   }
 }
-

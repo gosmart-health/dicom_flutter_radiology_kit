@@ -9,11 +9,13 @@ class WasmWorkerBridge implements FrameDecoder {
   Future<void> initialize() async {}
 
   @override
-  Future<DecodeResult> decodeFrame(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeFrame(
+      Uint8List encodedBytes, DecodeOptions options) async {
     return await Isolate.run(() => _decodeFrameSync(encodedBytes, options));
   }
 
-  static DecodeResult _decodeFrameSync(Uint8List encodedBytes, DecodeOptions options) {
+  static DecodeResult _decodeFrameSync(
+      Uint8List encodedBytes, DecodeOptions options) {
     final numPixels = options.width * options.height;
     final TypedData pixels;
 
@@ -28,7 +30,9 @@ class WasmWorkerBridge implements FrameDecoder {
       }
     }
 
-    if (encodedBytes.length > socOffset + 2 && encodedBytes[socOffset] == 0xFF && encodedBytes[socOffset + 1] == 0x4F) {
+    if (encodedBytes.length > socOffset + 2 &&
+        encodedBytes[socOffset] == 0xFF &&
+        encodedBytes[socOffset + 1] == 0x4F) {
       if (options.bitsAllocated == 16) {
         if (options.isSigned) {
           final list = Int16List(numPixels);
@@ -36,7 +40,8 @@ class WasmWorkerBridge implements FrameDecoder {
           final start = socOffset + 40;
           for (int i = 0; i < numPixels; i++) {
             final byteIdx = start + ((i * 2) % (dataLen > 2 ? dataLen - 2 : 1));
-            final val = (encodedBytes[byteIdx] << 8) | encodedBytes[byteIdx + 1];
+            final val =
+                (encodedBytes[byteIdx] << 8) | encodedBytes[byteIdx + 1];
             list[i] = val > 32767 ? val - 65536 : val;
           }
           pixels = list;
@@ -60,8 +65,10 @@ class WasmWorkerBridge implements FrameDecoder {
     } else {
       if (options.bitsAllocated == 16) {
         if (options.isSigned) {
-          if (encodedBytes.offsetInBytes % 2 == 0 && encodedBytes.lengthInBytes >= numPixels * 2) {
-            pixels = Int16List.view(encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
+          if (encodedBytes.offsetInBytes % 2 == 0 &&
+              encodedBytes.lengthInBytes >= numPixels * 2) {
+            pixels = Int16List.view(
+                encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
           } else {
             final list = Int16List(numPixels);
             final bd = ByteData.sublistView(encodedBytes);
@@ -72,8 +79,10 @@ class WasmWorkerBridge implements FrameDecoder {
             pixels = list;
           }
         } else {
-          if (encodedBytes.offsetInBytes % 2 == 0 && encodedBytes.lengthInBytes >= numPixels * 2) {
-            pixels = Uint16List.view(encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
+          if (encodedBytes.offsetInBytes % 2 == 0 &&
+              encodedBytes.lengthInBytes >= numPixels * 2) {
+            pixels = Uint16List.view(
+                encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
           } else {
             final list = Uint16List(numPixels);
             final bd = ByteData.sublistView(encodedBytes);
@@ -86,7 +95,8 @@ class WasmWorkerBridge implements FrameDecoder {
         }
       } else {
         if (encodedBytes.lengthInBytes >= numPixels) {
-          pixels = Uint8List.view(encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
+          pixels = Uint8List.view(
+              encodedBytes.buffer, encodedBytes.offsetInBytes, numPixels);
         } else {
           final list = Uint8List(numPixels);
           final count = encodedBytes.lengthInBytes.clamp(0, numPixels);
@@ -108,12 +118,14 @@ class WasmWorkerBridge implements FrameDecoder {
     );
   }
 
-  Future<DecodeResult> decodeJpeg(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeJpeg(
+      Uint8List encodedBytes, DecodeOptions options) async {
     try {
       final codec = await ui.instantiateImageCodec(encodedBytes);
       final frameInfo = await codec.getNextFrame();
       final image = frameInfo.image;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
       final width = image.width;
       final height = image.height;
@@ -143,7 +155,8 @@ class WasmWorkerBridge implements FrameDecoder {
     }
   }
 
-  Future<DecodeResult> decodeRle(Uint8List encodedBytes, DecodeOptions options) async {
+  Future<DecodeResult> decodeRle(
+      Uint8List encodedBytes, DecodeOptions options) async {
     return await Isolate.run(() => _decodeRleSync(encodedBytes, options));
   }
 
@@ -170,7 +183,8 @@ class WasmWorkerBridge implements FrameDecoder {
       final end = (s + 1 < numSegments) ? segmentOffsets[s + 1] : bytes.length;
       if (start >= bytes.length) break;
 
-      final segData = _unpackPackBitsFast(bytes, start, end.clamp(start, bytes.length), numPixels);
+      final segData = _unpackPackBitsFast(
+          bytes, start, end.clamp(start, bytes.length), numPixels);
       decompressedSegments.add(segData);
     }
 
@@ -213,7 +227,8 @@ class WasmWorkerBridge implements FrameDecoder {
     );
   }
 
-  static Uint8List _unpackPackBitsFast(Uint8List input, int start, int end, int expectedSize) {
+  static Uint8List _unpackPackBitsFast(
+      Uint8List input, int start, int end, int expectedSize) {
     final output = Uint8List(expectedSize);
     int inIdx = start;
     int outIdx = 0;
@@ -224,7 +239,9 @@ class WasmWorkerBridge implements FrameDecoder {
         final count = n + 1;
         final availableIn = end - inIdx;
         final neededOut = expectedSize - outIdx;
-        final copyLen = count < availableIn ? (count < neededOut ? count : neededOut) : (availableIn < neededOut ? availableIn : neededOut);
+        final copyLen = count < availableIn
+            ? (count < neededOut ? count : neededOut)
+            : (availableIn < neededOut ? availableIn : neededOut);
         if (copyLen > 0) {
           output.setRange(outIdx, outIdx + copyLen, input, inIdx);
           inIdx += count;
