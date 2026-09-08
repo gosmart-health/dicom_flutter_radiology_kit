@@ -5,6 +5,30 @@ All notable changes to `dicom_flutter_radiology_kit` will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.1] - 2026-09-08
+
+### Added
+- **Full DICOM Data Dictionary & Generator**:
+  - Full attribute dictionary generated from the standard `innolitics/dicom-standard` (`attributes.json`) comprising 5,041 exact standard tags and 88 repeating group wildcard patterns (curves `50xx`, overlays `60xx`, `002031xx`).
+  - Standardized `DicomTagInfo` model providing tag hex ID, formatted representation `(GGGG,EEEE)`, name, keyword, VR, VM, and retirement status.
+  - Private tag identification and automatic classification for odd-numbered groups (Private Creator `(GGGG,0010-00FF)` and Private Data).
+  - Generator script (`tool/generate_dicom_dictionary.dart`) and download script (`tool/update_dicom_dictionary.sh`) for automated dictionary maintenance.
+- **DICOM Dump Service (`DicomDumpService`)**:
+  - `DicomDumpService.dumpJson`: Generates enriched DICOM JSON with human-readable `"description"` metadata entries embedded.
+  - `DicomDumpService.dump`: Flattens and parses DICOM metadata into structured `DicomDumpResult` and `DicomDumpEntry` models with formatted values (Person Names, Dates, Times, Sequences `SQ`).
+  - Search and filtering across tags `(GGGG,EEEE)`, hex `GGGGEEEE`, keywords, attribute descriptions, or values.
+- **DICOM Dump Widget & Modal Dialog**:
+  - `DicomDumpWidget`: Reusable clinical metadata inspector with flat grid layout (`Tag`, `VR`, `VM`, `Description`, `Value`), live search toolbar, expandable sequence trees, and reactive `Stream<Map<String, dynamic>>` support.
+  - `DicomDumpDialog.show`: Dark radiology-themed modal dialog with click-outside-to-dismiss (`barrierDismissible: true`).
+  - Cross-platform file exports: "Download JSON" and "Download CSV" via `FileExporter` with native browser downloads on Web (`web.Blob` / `HTMLAnchorElement`) and clipboard fallback on Desktop/VM.
+- **Viewer Toolbar Integration**:
+  - Integrated "DICOM Dump" action button into the example app's top AppBar for instant inspection of the currently focused slice metadata.
+
+### Fixed
+- **Transfer Syntax Selection & Verification**:
+  - Fixed issue where requesting RAW transfer syntax could inadvertently request JPEG 2000 Lossless.
+  - Fixed JPEG 2000 Lossless decoding across Web Worker WASM bridge (`web/j2k_worker.js`) and ensured proper negotiation with PACS endpoints (such as Orthanc).
+
 ## [0.0.0] - 2026-09-04
 
 ### Pre-Release Evaluation Version
