@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:web/web.dart' as web;
@@ -61,6 +62,13 @@ class WasmWorkerBridge implements FrameDecoder {
   static int _nextRequestId = 1;
   static final Map<int, Completer<DecodeResult>> _pendingRequests = {};
 
+  static final List<String> _workerCandidates = [
+    'j2k_worker.js',
+    'assets/packages/dicom_flutter_radiology_kit/web/j2k_worker.js',
+    'assets/web/j2k_worker.js',
+  ];
+  static int _candidateIndex = 0;
+
   Future<void> initialize() async {
     _ensureWorker();
   }
@@ -68,23 +76,28 @@ class WasmWorkerBridge implements FrameDecoder {
   static void _ensureWorker() {
     if (_workerInitAttempted) return;
     _workerInitAttempted = true;
+    _tryStartNextWorker();
+  }
 
+  static void _tryStartNextWorker() {
+    if (_candidateIndex >= _workerCandidates.length) {
+      _workerFailed = true;
+      _worker = null;
+      return;
+    }
+
+    final scriptUrl = _workerCandidates[_candidateIndex++];
     try {
-      final worker = web.Worker('j2k_worker.js'.toJS);
-      _setupWorkerListeners(worker);
+      final worker = web.Worker(scriptUrl.toJS);
+      _setupWorkerListeners(worker, scriptUrl);
       _worker = worker;
-    } catch (_) {
-      try {
-        final worker = web.Worker('assets/packages/dicom_flutter_radiology_kit/web/j2k_worker.js'.toJS);
-        _setupWorkerListeners(worker);
-        _worker = worker;
-      } catch (e) {
-        _workerFailed = true;
-      }
+    } catch (e) {
+      print('[DICOM-WORKER] Could not instantiate worker at $scriptUrl: $e');
+      _tryStartNextWorker();
     }
   }
 
-  static void _setupWorkerListeners(web.Worker worker) {
+  static void _setupWorkerListeners(web.Worker worker, String scriptUrl) {
     worker.onmessage = ((web.MessageEvent event) {
       final data = event.data;
       if (data == null) return;
@@ -165,10 +178,26 @@ class WasmWorkerBridge implements FrameDecoder {
     }).toJS;
 
     worker.onerror = ((web.Event event) {
+      String errorMsg = 'Worker error event';
+      if (event is web.ErrorEvent) {
+        errorMsg = '${event.message} (${event.filename}:${event.lineno})';
+      }
+      print('[DICOM-WORKER] Worker at "$scriptUrl" failed: $errorMsg');
+
+      try {
+        worker.terminate();
+      } catch (_) {}
+
+      // If no requests were in flight and we have candidates left, try next candidate
+      if (_pendingRequests.isEmpty && _candidateIndex < _workerCandidates.length) {
+        _tryStartNextWorker();
+        return;
+      }
+
       _workerFailed = true;
       for (final completer in _pendingRequests.values) {
         if (!completer.isCompleted) {
-          completer.completeError(Exception('Worker error event'));
+          completer.completeError(Exception(errorMsg));
         }
       }
       _pendingRequests.clear();
@@ -259,8 +288,47 @@ class WasmWorkerBridge implements FrameDecoder {
     }
   }
 
+  static bool get _hasWindowDecodeJpeg2000 =>
+      (web.window as JSObject).getProperty<JSAny?>('decodeJpeg2000'.toJS) != null;
+
+  static Future<void> _ensureWindowScriptsLoaded() async {
+    if (_hasWindowDecodeJpeg2000) return;
+
+    final candidateUrls = [
+      'openjpegwasm.js',
+      'assets/packages/dicom_flutter_radiology_kit/web/openjpegwasm.js',
+      'assets/web/openjpegwasm.js',
+    ];
+
+    for (final url in candidateUrls) {
+      try {
+        final completer = Completer<void>();
+        final script = web.document.createElement('script') as web.HTMLScriptElement;
+        script.src = url;
+        script.onload = ((web.Event _) {
+          completer.complete();
+        }).toJS;
+        script.onerror = ((web.Event _) {
+          completer.completeError(Exception('Failed to load $url'));
+        }).toJS;
+        web.document.head?.appendChild(script);
+        await completer.future;
+        if (_hasWindowDecodeJpeg2000) {
+          return;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
   Future<DecodeResult> _decodeViaWindow(Uint8List encodedBytes, DecodeOptions options) async {
     try {
+      await _ensureWindowScriptsLoaded();
+      if (!_hasWindowDecodeJpeg2000) {
+        throw Exception('OpenJPEG WASM decoding unavailable: decodeJpeg2000 not found on window');
+      }
+
       final promise = decodeJpeg2000Js(
         encodedBytes.toJS,
         options.width.toJS,
@@ -277,11 +345,16 @@ class WasmWorkerBridge implements FrameDecoder {
 
       final TypedData pixels;
       if (jsResult.pixelData16 != null) {
-        pixels = jsResult.pixelData16!.toDart;
+        final dart16 = jsResult.pixelData16!.toDart;
+        if (isSigned) {
+          pixels = dart16.buffer.asInt16List(dart16.offsetInBytes, dart16.length);
+        } else {
+          pixels = dart16;
+        }
       } else if (jsResult.pixelData8 != null) {
         pixels = jsResult.pixelData8!.toDart;
       } else {
-        pixels = Uint16List(width * height);
+        pixels = isSigned ? Int16List(width * height) : Uint16List(width * height);
       }
 
       return DecodeResult(

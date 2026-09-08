@@ -44,8 +44,8 @@ class DicomFrameBuffer {
   Future<PixelFrame> toPixelFrame() async {
     final transferSyntax = metadata.transferSyntaxUID ?? DicomTransferSyntaxes.explicitVRLittleEndian;
     final options = DecodeOptions(
-      width: metadata.rows,
-      height: metadata.columns,
+      width: metadata.columns,
+      height: metadata.rows,
       bitsAllocated: metadata.bitsAllocated,
       bitsStored: metadata.bitsStored,
       isSigned: metadata.isSigned,

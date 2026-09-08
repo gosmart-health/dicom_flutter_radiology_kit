@@ -19,12 +19,15 @@ let j2kDecoder = null;
 async function initWasm() {
   if (!openjpegModule) {
     if (typeof OpenJPEGWASM === 'function') {
+      const basePath = (typeof self !== 'undefined' && self.location && self.location.href)
+        ? self.location.href.substring(0, self.location.href.lastIndexOf('/') + 1)
+        : '';
       openjpegModule = await OpenJPEGWASM({
         locateFile: function(path, scriptDirectory) {
           if (path.indexOf('.wasm') !== -1) {
-            return (scriptDirectory || '') + 'openjpegwasm.wasm';
+            return (scriptDirectory || basePath) + 'openjpegwasm.wasm';
           }
-          return (scriptDirectory || '') + path;
+          return (scriptDirectory || basePath) + path;
         }
       });
       if (openjpegModule && openjpegModule.J2KDecoder) {

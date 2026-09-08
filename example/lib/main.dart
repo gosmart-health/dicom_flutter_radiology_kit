@@ -250,6 +250,66 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     }
   }
 
+  Map<String, dynamic> _getActiveSliceMetadata() {
+    if (_loadedSeries != null && _loadedSeries!.frames.isNotEmpty) {
+      final idx = _currentFrameIndex.clamp(0, _loadedSeries!.frames.length - 1);
+      return _loadedSeries!.frames[idx].metadata.rawJson;
+    }
+    // Synthetic fallback metadata for test pattern fixtures
+    return {
+      '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.7']},
+      '00080018': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1.1']},
+      '00080020': {'vr': 'DA', 'Value': ['20260908']},
+      '00080030': {'vr': 'TM', 'Value': ['120000']},
+      '00080060': {'vr': 'CS', 'Value': ['OT']},
+      '00080070': {'vr': 'LO', 'Value': ['RadiologyKit']},
+      '00080080': {'vr': 'LO', 'Value': ['Radiology Department']},
+      '00081030': {'vr': 'LO', 'Value': [_selectedFixture]},
+      '0008103E': {'vr': 'LO', 'Value': ['Synthetic Calibration Test Pattern']},
+      '00100010': {
+        'vr': 'PN',
+        'Value': [
+          {'Alphabetic': _selectedFixture.contains('TG18') ? 'QUALITY^CONTROL' : 'CALIBRATION^RAMP'}
+        ]
+      },
+      '00100020': {'vr': 'LO', 'Value': [_selectedFixture.contains('TG18') ? 'QC-TG18-001' : 'RAMP-16BIT-002']},
+      '00100040': {'vr': 'CS', 'Value': ['O']},
+      '0020000D': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1']},
+      '0020000E': {'vr': 'UI', 'Value': ['1.2.826.0.1.3680043.9.7133.1.1']},
+      '00200013': {'vr': 'IS', 'Value': ['1']},
+      '00280002': {'vr': 'US', 'Value': [1]},
+      '00280004': {'vr': 'CS', 'Value': ['MONOCHROME2']},
+      '00280010': {'vr': 'US', 'Value': [512]},
+      '00280011': {'vr': 'US', 'Value': [512]},
+      '00280100': {'vr': 'US', 'Value': [16]},
+      '00280101': {'vr': 'US', 'Value': [12]},
+      '00280102': {'vr': 'US', 'Value': [11]},
+      '00280103': {'vr': 'US', 'Value': [0]},
+      '00281050': {'vr': 'DS', 'Value': [_primaryController.windowCenter.toStringAsFixed(0)]},
+      '00281051': {'vr': 'DS', 'Value': [_primaryController.windowWidth.toStringAsFixed(0)]},
+    };
+  }
+
+  void _openDicomDumpModal() {
+    final metadata = _getActiveSliceMetadata();
+    final sliceNum = _loadedSeries != null ? _currentFrameIndex + 1 : 1;
+    final total = _loadedSeries != null ? _loadedSeries!.frameCount : 1;
+    DicomDumpDialog.show(
+      context,
+      metadataJson: metadata,
+      title: 'DICOM Dump — Slice $sliceNum of $total ($selectedFixtureName)',
+    );
+  }
+
+  String get selectedFixtureName {
+    if (_loadedSeries != null) {
+      return _loadedSeries!.series.seriesDescription.isNotEmpty
+          ? _loadedSeries!.series.seriesDescription
+          : 'Series';
+    }
+    return _selectedFixture;
+  }
+
   Future<void> _goToFrame(int index) async {
     if (_loadedSeries == null || _isLoadingFrame) return;
     if (index < 0 || index >= _loadedSeries!.frameCount) return;
@@ -401,6 +461,18 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                 c.resetView();
               }
             },
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: _openDicomDumpModal,
+            icon: const Icon(Icons.data_object_rounded, size: 16),
+            label: const Text('DICOM Dump', style: TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF21262D),
+              foregroundColor: const Color(0xFF58A6FF),
+              side: const BorderSide(color: Color(0xFF30363D)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
           ),
           const SizedBox(width: 8),
           IconButton(

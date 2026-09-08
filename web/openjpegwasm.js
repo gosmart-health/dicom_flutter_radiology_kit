@@ -30,11 +30,11 @@ if (typeof exports === 'object' && typeof module === 'object') {
     if (!_globalModulePromise) {
       if (typeof OpenJPEGWASM === 'function') {
         _globalModulePromise = OpenJPEGWASM({
-          locateFile: function(path) {
+          locateFile: function(path, scriptDirectory) {
             if (path && path.indexOf('.wasm') !== -1) {
-              return 'openjpegwasm.wasm';
+              return (scriptDirectory || '') + 'openjpegwasm.wasm';
             }
-            return path;
+            return (scriptDirectory || '') + path;
           }
         }).then(function(mod) {
           _globalDecoderInstance = new mod.J2KDecoder();
@@ -72,11 +72,10 @@ if (typeof exports === 'object' && typeof module === 'object') {
       var is16 = (frameInfo && frameInfo.bitsPerSample && frameInfo.bitsPerSample > 8) || (bitsAllocated > 8);
 
       if (is16) {
-        var u16 = new Uint16Array(rawBytes.buffer, rawBytes.byteOffset, rawBytes.length / 2);
-        var copy16 = new Uint16Array(u16.length);
-        for (var k = 0; k < u16.length; k++) {
-          copy16[k] = u16[k];
-        }
+        var copy16 = new Uint16Array(rawBytes.length / 2);
+        new Uint8Array(copy16.buffer).set(
+          new Uint8Array(rawBytes.buffer, rawBytes.byteOffset, rawBytes.length)
+        );
         return {
           pixelData16: copy16,
           width: outWidth,

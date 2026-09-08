@@ -23,7 +23,7 @@ Add `dicom_flutter_radiology_kit` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dicom_flutter_radiology_kit: ^0.1.0
+  dicom_flutter_radiology_kit: ^0.0.1
 ```
 
 ### Basic Viewport Usage
