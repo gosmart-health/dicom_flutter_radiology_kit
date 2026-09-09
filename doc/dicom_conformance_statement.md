@@ -2,7 +2,7 @@
 
 **GoSmartHealth DICOM Flutter Radiology Kit (`dicom_flutter_radiology_kit`)**  
 **Document ID:** DCS-GFRK-001  
-**Software Version:** 0.0.1+  
+**Software Version:** 0.0.2  
 **Date:** September 2026  
 **Standard Compliance:** NEMA PS 3.2 (DICOM Conformance)  
 
@@ -34,13 +34,13 @@ The application implements a DICOMweb Service Class User (SCU) interface support
 | RetrieveFrames (`/frames/{frameList}`) | **Yes** | No | Stream uncompressed raw scalar bytes or JPEG 2000 bitstreams |
 | RetrieveRendered | No | No | Not utilized; kit renders raw 16-bit scalar frames client-side |
 | **STOW-RS (Store)** | | | |
-| StoreInstances (`/studies`) | *Planned* | No | GSPS softcopy presentation state upload planned for future release |
+| StoreInstances (`/studies`) | **Yes** | No | GSPS softcopy presentation state upload via binary Part 10 multipart/related payload |
 
 ### Table 1-2: Grayscale Softcopy Presentation State (GSPS) Overview
 
 | SOP Class Name | SOP Class UID | Role | Comments |
 | :--- | :--- | :---: | :--- |
-| **Grayscale Softcopy Presentation State Storage** | `1.2.840.10008.5.1.4.1.1.11.1` | **SCU / Display** | Interactive rendering and JSON serialization of `POLYLINE`, `CIRCLE`, `ELLIPSE`, and `TEXT` objects |
+| **Grayscale Softcopy Presentation State Storage** | `1.2.840.10008.5.1.4.1.1.11.1` | **SCU / Display & Store** | Interactive rendering, JSON serialization, and binary Part 10 DICOM encoding for PACS STOW-RS storage |
 
 ### Table 1-3: Supported Transfer Syntaxes for Frame Streaming
 
@@ -89,6 +89,7 @@ The application implements a DICOMweb Service Class User (SCU) interface support
 
 | Document Version | Date | Author / Organization | Description of Changes |
 | :--- | :--- | :--- | :--- |
+| **0.0.2** | September 2026 | GoSmartHealth Engineering Team | Added native DICOM Part 10 GSPS binary encoder, STOW-RS presentation state store capability, QIDO-RS presentation state query and one-click application to viewports. |
 | **0.0.1** | September 2026 | GoSmartHealth Engineering Team | Initial draft covering QIDO-RS, WADO-RS, 16-bit scalar display pipeline, GSPS annotations, and physical metric calibrations. |
 
 ### 3.2 Audience
@@ -374,6 +375,14 @@ Every presentation state contains:
 1. Viewing all annotations across all collaborating physicians.
 2. Filtering annotations strictly by the active reviewer (`creatorName`).
 3. Toggling annotation visibility without altering underlying DICOM data structures.
+
+#### B.4 DICOM Part 10 GSPS Binary Encoder & STOW-RS Storage
+
+`dicom_flutter_radiology_kit` provides native generation and persistence of binary Part 10 DICOM files for Grayscale Softcopy Presentation State via `GspsDicomEncoder`:
+- **Format**: Conforms to DICOM PS 3.10 with standard 128-byte preamble and `"DICM"` prefix.
+- **Transfer Syntax**: Explicit VR Little Endian (`1.2.840.10008.1.2.1`).
+- **Encapsulated Modules**: Patient Module, General Study Module, General Series Module, SOP Common Module, Presentation State Identification Module, Presentation State Relationship Module, Graphic Annotation Module, Graphic Layer Module, and Softcopy VOI LUT Module.
+- **STOW-RS SCU**: `DicomWebClient.storePresentationState` encapsulates the generated Part 10 dataset into a `multipart/related; type="application/dicom"` HTTP POST payload sent directly to PACS/VNA STOW-RS endpoints.
 
 ---
 

@@ -5,6 +5,27 @@ All notable changes to `dicom_flutter_radiology_kit` will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.2] - 2026-09-09
+
+### Added
+- **Native DICOM Part 10 GSPS Binary Encoder (`GspsDicomEncoder`)**:
+  - Implemented compliant Part 10 DICOM file writer producing binary Grayscale Softcopy Presentation State (GSPS) storage SOP Class (`1.2.840.10008.5.1.4.1.1.11.1`) datasets (`application/dicom`).
+  - Standard 128-byte preamble with ASCII `"DICM"` magic marker prefix.
+  - Complete File Meta Information header (Group 0002) with Little Endian Explicit VR transfer syntax (`1.2.840.10008.1.2.1`), Media Storage SOP Class UID, and Media Storage SOP Instance UID.
+  - Full module encapsulation: Patient Module, General Study Module, General Series Module, SOP Common Module, Presentation State Identification Module, Presentation State Relationship Module, Graphic Annotation Module (`0070,0001`), Graphic Layer Module (`0070,0060`), and Softcopy VOI LUT Module.
+  - Serialization of graphic objects: `POLYLINE` (calipers, Cobb angles, open and closed polylines), `CIRCLE` (center & perimeter point pairs), `ELLIPSE` (4-point major/minor axes bounding points), and `TEXT` (`UnformattedTextValue` with anchor coordinates and bounding boxes).
+- **STOW-RS Presentation State Store Client (`DicomWebClient.storePresentationState`)**:
+  - Direct PACS/VNA persistence via DICOMweb STOW-RS REST standard.
+  - Streams `multipart/related; type="application/dicom"` HTTP POST requests encapsulating binary GSPS Part 10 datasets to `/studies` and `/studies/{studyUID}` endpoints.
+- **QIDO-RS Presentation State Retrieval & Dynamic Viewport Integration**:
+  - Added `DicomWebClient.fetchSeriesPresentationStates` and `fetchPresentationStates` to fetch and parse GSPS JSON metadata (`application/dicom+json`) into native annotation objects.
+  - Enhanced `QidoBrowserDialog` with dedicated presentation state badge styling and active `[Load & Apply Annotations]` action buttons on PR series cards.
+  - Context-aware series matching (`currentLoadedSeries`) enabling instant annotation injection into active viewports without re-downloading image pixel frames.
+- **Testing & Quality Verification**:
+  - Added unit test suite `test/gsps_dicom_encoder_test.dart` verifying binary DICOM layout, preamble, DICM prefix, Little Endian Explicit VR tags, nested sequences, and graphic data geometries.
+  - Added widget tests in `test/qido_browser_dialog_test.dart` verifying PR series rendering, button enablement, and annotation loading callbacks.
+  - Added live integration test `test/live_mock_stow_wado_test.dart` validating full roundtrip STOW-RS store, QIDO-RS search, and WADO-RS retrieval against the mock DICOM server.
+
 ## [0.0.1] - 2026-09-08
 
 ### Added
