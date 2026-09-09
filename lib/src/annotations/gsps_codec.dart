@@ -210,8 +210,6 @@ class GspsPresentationState {
   }
 
   /// Converts text annotations to standard DICOM PS 3.3 Text Objects.
-  /// When [includeMeasurementReadouts] is true, also generates companion text readouts for Calipers and Angles.
-  List<GspsTextObject> toTextObjects({bool includeMeasurementReadouts = false}) {
   /// When [includeMeasurementReadouts] is true, also generates companion text readouts for Calipers, Angles, Circles, Ellipses, and Polylines.
   List<GspsTextObject> toTextObjects({
     bool includeMeasurementReadouts = false,
@@ -233,11 +231,8 @@ class GspsPresentationState {
               : null,
         ));
       } else if (includeMeasurementReadouts && ann is CaliperAnnotation) {
-        final dist = (ann.end - ann.start).distance;
         final distStr = ann.formatDistance(pixelSpacing: pixelSpacing);
         final labelText = ann.label != null && ann.label!.isNotEmpty
-            ? '${ann.label}: ${dist.toStringAsFixed(1)} px'
-            : '${dist.toStringAsFixed(1)} px';
             ? '${ann.label}: $distStr'
             : distStr;
         list.add(GspsTextObject(
@@ -248,11 +243,8 @@ class GspsPresentationState {
           ),
         ));
       } else if (includeMeasurementReadouts && ann is AngleAnnotation) {
-        final deg = ann.computeAngleDegrees();
         final angleStr = ann.formatAngle();
         final labelText = ann.label != null && ann.label!.isNotEmpty
-            ? '${ann.label}: ${deg.toStringAsFixed(1)}°'
-            : '${deg.toStringAsFixed(1)}°';
             ? '${ann.label}: $angleStr'
             : angleStr;
         list.add(GspsTextObject(
@@ -429,7 +421,6 @@ class GspsPresentationState {
       }
     }
 
-    for (final t in textObjects) {
     // Remaining un-matched text objects become standalone TextAnnotations
     for (final t in remainingTextObjects) {
       final id = 'gsps_t_${counter++}';

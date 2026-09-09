@@ -117,7 +117,6 @@ class GspsDicomEncoder {
     // Group 0070: Presentation State & Graphic Annotation Modules (strictly ascending tags)
     // 1. (0070,0001) SQ GraphicAnnotationSequence
     final graphicObjs = gsps.toGraphicObjects();
-    final textObjs = gsps.toTextObjects();
     final textObjs = gsps.toTextObjects(
       includeMeasurementReadouts: true,
       pixelSpacing: pixelSpacing,

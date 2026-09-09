@@ -211,7 +211,6 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
 
     // Drawing tools
     final clampedPt = transform.clampImagePoint(imagePt);
-    _drawStartPoint = clampedPt;
 
     if (tool == AnnotationTool.caliper) {
       if (_drawStartPoint != null &&
@@ -237,12 +236,7 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       );
       widget.annotationController.setDraftAnnotation(draft);
     } else if (tool == AnnotationTool.circle) {
-      return;
-    }
-
-    _drawStartPoint = clampedPt;
-
-    if (tool == AnnotationTool.circle) {
+      _drawStartPoint = clampedPt;
       final draft = CircleAnnotation(
         id: 'draft_${DateTime.now().millisecondsSinceEpoch}',
         center: clampedPt,
@@ -456,8 +450,6 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       if (_multiStepPoints.length == 1) {
         final draft = AngleAnnotation(
           id: 'draft_angle',
-          p1: clampedPt,
-          vertex: _multiStepPoints[0],
           p1: _multiStepPoints[0],
           vertex: clampedPt,
           p2: clampedPt,
@@ -521,8 +513,6 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
         _drawStartPoint = null;
         widget.annotationController.setDraftAnnotation(null);
       }
-      _drawStartPoint = null;
-      widget.annotationController.setDraftAnnotation(null);
       // If distance < 3.0, keep _drawStartPoint and draft active for click-to-click placement
     } else if (tool == AnnotationTool.circle && _drawStartPoint != null) {
       final r = (imagePt - _drawStartPoint!).distance;
