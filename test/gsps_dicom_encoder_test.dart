@@ -432,6 +432,99 @@ void main() {
       expect(dumpResult.entries.length, equals(1));
       expect(dumpResult.entries.first.displayValue, equals('3 Tool(s): 2 caliper, 1 angle'));
     });
+
+    test('Parses Softcopy VOI LUT sequence (0028,3110) from DICOM JSON', () {
+      final dicomJson = {
+        '00080018': {'vr': 'UI', 'Value': ['2.25.777777']},
+        '00283110': {
+          'vr': 'SQ',
+          'Value': [
+            {
+              '00281050': {'vr': 'DS', 'Value': ['400.0']},
+              '00281051': {'vr': 'DS', 'Value': ['2000.0']},
+              '00281055': {'vr': 'LO', 'Value': ['LUNG_PRESET']},
+            }
+          ]
+        },
+        '00700080': {'vr': 'CS', 'Value': ['VOI_TEST']},
+      };
+
+      final restored = GspsPresentationState.fromDicomJson(dicomJson);
+      expect(restored.windowCenter, equals(400.0));
+      expect(restored.windowWidth, equals(2000.0));
+      expect(restored.windowCenterWidthExplanation, equals('LUNG_PRESET'));
+    });
+
+    test('Encodes VOI LUT parameters into DICOM Part 10 binary dataset (0028,3110) and top-level tags (0028,1050/1051)', () {
+      final gsps = GspsPresentationState(
+        contentLabel: 'ENCODE_VOI',
+        windowCenter: 40.0,
+        windowWidth: 400.0,
+        windowCenterWidthExplanation: 'SOFT_TISSUE',
+        annotations: [],
+      );
+
+      final bytes = gsps.toDicomPart10Bytes(
+        studyInstanceUid: '1.2.3.4',
+        seriesInstanceUid: '1.2.3.4.5',
+        sopInstanceUid: '1.2.3.4.5.6',
+      );
+
+      final rawStr = String.fromCharCodes(bytes);
+      expect(rawStr.contains('40.0'), isTrue);
+      expect(rawStr.contains('400.0'), isTrue);
+      expect(rawStr.contains('SOFT_TISSUE'), isTrue);
+    });
+
+    test('Encodes Displayed Area Selection sequence (0070,005A) with zoom into DICOM Part 10 binary dataset', () {
+      final gsps = GspsPresentationState(
+        contentLabel: 'ENCODE_ZOOM',
+        windowCenter: 100.0,
+        windowWidth: 500.0,
+        zoom: 2.75,
+        panOffset: const Offset(50.0, 50.0),
+        annotations: [],
+      );
+
+      final bytes = gsps.toDicomPart10Bytes(
+        studyInstanceUid: '1.2.3.4',
+        seriesInstanceUid: '1.2.3.4.5',
+        sopInstanceUid: '1.2.3.4.5.6',
+      );
+
+      final rawStr = String.fromCharCodes(bytes);
+      expect(rawStr.contains('MAGNIFY'), isTrue);
+      expect(rawStr.contains('ENCODE_ZOOM'), isTrue);
+
+      // Verify default zoom (1.0) also generates 0070,005A Displayed Area Selection sequence
+      final gspsDefaultZoom = GspsPresentationState(
+        contentLabel: 'DEFAULT_ZOOM',
+        annotations: [],
+      );
+      final defaultBytes = gspsDefaultZoom.toDicomPart10Bytes(
+        studyInstanceUid: '1.2.3.4',
+        seriesInstanceUid: '1.2.3.4.5',
+        sopInstanceUid: '1.2.3.4.5.6',
+      );
+      expect(String.fromCharCodes(defaultBytes).contains('MAGNIFY'), isTrue);
+
+      final dicomJson = {
+        '00080018': {'vr': 'UI', 'Value': ['1.2.3.4.5.6']},
+        '0070005A': {
+          'vr': 'SQ',
+          'Value': [
+            {
+              '00700100': {'vr': 'CS', 'Value': ['MAGNIFY']},
+              '00700103': {'vr': 'FL', 'Value': [2.75]},
+            }
+          ]
+        },
+        '00700080': {'vr': 'CS', 'Value': ['ENCODE_ZOOM']},
+      };
+
+      final restored = GspsPresentationState.fromDicomJson(dicomJson);
+      expect(restored.zoom, equals(2.75));
+    });
   });
 }
 

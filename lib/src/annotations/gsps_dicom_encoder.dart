@@ -114,6 +114,25 @@ class GspsDicomEncoder {
     dsBuilder.writeIs(0x0020, 0x0011, '99'); // Series Number
     dsBuilder.writeIs(0x0020, 0x0013, (frameNumber ?? 1).toString()); // Instance Number
 
+    // Group 0028: Softcopy VOI LUT Module (0028,3110) & Top-level Window Center (0028,1050) / Width (0028,1051)
+    if (gsps.windowCenter != null && gsps.windowWidth != null) {
+      dsBuilder.writeDs(0x0028, 0x1050, gsps.windowCenter!.toString());
+      dsBuilder.writeDs(0x0028, 0x1051, gsps.windowWidth!.toString());
+      if (gsps.windowCenterWidthExplanation != null &&
+          gsps.windowCenterWidthExplanation!.isNotEmpty) {
+        dsBuilder.writeLo(0x0028, 0x1055, gsps.windowCenterWidthExplanation!);
+      }
+
+      final voiItem = _DicomElementBuilder(isLittleEndian: true);
+      voiItem.writeDs(0x0028, 0x1050, gsps.windowCenter!.toString()); // Window Center
+      voiItem.writeDs(0x0028, 0x1051, gsps.windowWidth!.toString()); // Window Width
+      if (gsps.windowCenterWidthExplanation != null &&
+          gsps.windowCenterWidthExplanation!.isNotEmpty) {
+        voiItem.writeLo(0x0028, 0x1055, gsps.windowCenterWidthExplanation!);
+      }
+      dsBuilder.writeSequence(0x0028, 0x3110, [voiItem.toBytes()]);
+    }
+
     // Group 0070: Presentation State & Graphic Annotation Modules (strictly ascending tags)
     // 1. (0070,0001) SQ GraphicAnnotationSequence
     final graphicObjs = gsps.toGraphicObjects();
@@ -172,6 +191,15 @@ class GspsDicomEncoder {
       dsBuilder.writeSequence(0x0070, 0x0001, [annotationItem.toBytes()]);
     }
 
+    // 1.5 (0070,005A) SQ DisplayedAreaSelectionSequence
+    final zoomVal = gsps.zoom ?? 1.0;
+    final dispItem = _DicomElementBuilder(isLittleEndian: true);
+    dispItem.writeSlList(0x0070, 0x0052, [1, 1]); // Top Left Corner [1, 1]
+    dispItem.writeSlList(0x0070, 0x0053, [512, 512]); // Bottom Right Corner [512, 512]
+    dispItem.writeCs(0x0070, 0x0100, 'MAGNIFY'); // Presentation Size Mode
+    dispItem.writeFlList(0x0070, 0x0103, [zoomVal]); // Presentation Pixel Magnification Ratio
+    dsBuilder.writeSequence(0x0070, 0x005A, [dispItem.toBytes()]);
+
     // 2. (0070,0060) SQ GraphicLayerSequence
     final layerItem = _DicomElementBuilder(isLittleEndian: true);
     layerItem.writeCs(0x0070, 0x0002, 'LAYER1');
@@ -190,8 +218,18 @@ class GspsDicomEncoder {
     }
 
     // 4. Group 0079: Private Application Semantics (GOSMART_HEALTH_GSPS_V1)
-    // Allows high-fidelity reconstruction of interactive tool semantics (Caliper, Angle, etc.)
-    final annotationsJson = jsonEncode(gsps.annotations.map((a) => a.toJson()).toList());
+    // Allows high-fidelity reconstruction of interactive tool semantics (Caliper, Angle, VOI LUT, Zoom, Pan, etc.)
+    final semanticsPayload = {
+      if (gsps.windowCenter != null) 'windowCenter': gsps.windowCenter,
+      if (gsps.windowWidth != null) 'windowWidth': gsps.windowWidth,
+      if (gsps.windowCenterWidthExplanation != null)
+        'windowCenterWidthExplanation': gsps.windowCenterWidthExplanation,
+      if (gsps.zoom != null) 'zoom': gsps.zoom,
+      if (gsps.panOffset != null) 'panDx': gsps.panOffset!.dx,
+      if (gsps.panOffset != null) 'panDy': gsps.panOffset!.dy,
+      'annotations': gsps.annotations.map((a) => a.toJson()).toList(),
+    };
+    final annotationsJson = jsonEncode(semanticsPayload);
     dsBuilder.writeLo(privateGroup, privateCreatorElement, privateCreatorTag);
     dsBuilder.writeUt(privateGroup, privateSemanticsElement, annotationsJson);
 
@@ -247,6 +285,10 @@ class _DicomElementBuilder {
 
   void writeCs(int group, int element, String value) {
     _writeStringElement(group, element, 'CS', value);
+  }
+
+  void writeDs(int group, int element, String value) {
+    _writeStringElement(group, element, 'DS', value);
   }
 
   void writeSh(int group, int element, String value) {
@@ -316,6 +358,16 @@ class _DicomElementBuilder {
     final bd = ByteData(len);
     for (int i = 0; i < floats.length; i++) {
       bd.setFloat32(i * 4, floats[i], isLittleEndian ? Endian.little : Endian.big);
+    }
+    _builder.add(bd.buffer.asUint8List());
+  }
+
+  void writeSlList(int group, int element, List<int> values) {
+    final len = values.length * 4;
+    _writeHeaderShortLength(group, element, 'SL', len);
+    final bd = ByteData(len);
+    for (int i = 0; i < values.length; i++) {
+      bd.setInt32(i * 4, values[i], isLittleEndian ? Endian.little : Endian.big);
     }
     _builder.add(bd.buffer.asUint8List());
   }
