@@ -6,24 +6,24 @@
       "request": "launch",
       "type": "dart",
       "flutterMode": "debug",
-      "program": "example/lib/main.dart",
+      "cwd": "example",
+      "program": "lib/main.dart",
       "deviceId": "chrome",
       "args": [
-        "--web-browser-flag",
-        "--disable-web-security"
+        "--web-browser-flag=--disable-web-security"
       ]
     },
     {
       "name": "WASM-Chrome",
       "request": "launch",
       "type": "dart",
-      "flutterMode": "debug",
-      "program": "example/lib/main.dart",
+      "flutterMode": "profile",
+      "cwd": "example",
+      "program": "lib/main.dart",
       "deviceId": "chrome",
       "args": [
         "--wasm",
-        "--web-browser-flag",
-        "--disable-web-security"
+        "--web-browser-flag=--disable-web-security"
       ]
     },
     {
@@ -31,7 +31,8 @@
       "request": "launch",
       "type": "dart",
       "flutterMode": "debug",
-      "program": "example/lib/main.dart",
+      "cwd": "example",
+      "program": "lib/main.dart",
       "deviceId": "macos"
     }
   ]
