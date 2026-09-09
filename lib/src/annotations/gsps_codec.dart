@@ -297,10 +297,6 @@ class GspsPresentationState {
 
   /// Reconstructs annotations from DICOM Graphic and Text Objects.
   static List<DicomAnnotation> fromDicomObjects({
-  List<DicomAnnotation> fromDicomObjects({
-  List<DicomAnnotation> fromDicomObjects({
-  List<DicomAnnotation> fromDicomObjects({
-  List<DicomAnnotation> fromDicomObjects({
     required List<GspsGraphicObject> graphicObjects,
     required List<GspsTextObject> textObjects,
     String? creatorName,
@@ -466,10 +462,6 @@ class GspsPresentationState {
       };
 
   static DicomAnnotation? _parseAnnotation(Map<String, dynamic> m) {
-  DicomAnnotation? _parseAnnotation(Map<String, dynamic> m) {
-  DicomAnnotation? _parseAnnotation(Map<String, dynamic> m) {
-  DicomAnnotation? _parseAnnotation(Map<String, dynamic> m) {
-  DicomAnnotation? _parseAnnotation(Map<String, dynamic> m) {
     final typeStr = m['type'] as String?;
     switch (typeStr) {
       case 'caliper':
@@ -776,7 +768,4 @@ class GspsPresentationState {
       GspsPresentationState.fromJson(
           json.decode(jsonStr) as Map<String, dynamic>);
 }
-  return null;
 
-
-  return null;
