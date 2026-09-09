@@ -27,6 +27,7 @@ export 'src/annotations/annotation_painter.dart';
 export 'src/annotations/annotation_controller.dart';
 export 'src/annotations/dicom_annotation_layer.dart';
 export 'src/annotations/gsps_codec.dart';
+export 'src/annotations/gsps_dicom_encoder.dart';
 
 // Widgets
 export 'src/widgets/dicom_viewport.dart';

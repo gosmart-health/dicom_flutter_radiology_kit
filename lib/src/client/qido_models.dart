@@ -294,6 +294,13 @@ class DicomSeries {
     required this.rawJson,
   });
 
+  bool get isImageSeries =>
+      modality.toUpperCase() != 'PR' &&
+      modality.toUpperCase() != 'KO' &&
+      modality.toUpperCase() != 'SR' &&
+      modality.toUpperCase() != 'AU' &&
+      modality.toUpperCase() != 'DOC';
+
   factory DicomSeries.fromJson(Map<String, dynamic> json) {
     final seriesInstanceUID = DicomJsonHelper.getString(json, '0020000E') ?? '';
     final studyInstanceUID = DicomJsonHelper.getString(json, '0020000D') ?? '';
@@ -337,6 +344,10 @@ class DicomInstanceSummary {
   final String? transferSyntaxUID;
   final PixelSpacing? pixelSpacing;
   final Map<String, dynamic> rawJson;
+
+  bool get isImage =>
+      sopClassUID != '1.2.840.10008.5.1.4.1.1.11.1' &&
+      DicomJsonHelper.getString(rawJson, '00080060')?.toUpperCase() != 'PR';
 
   const DicomInstanceSummary({
     required this.sopInstanceUID,

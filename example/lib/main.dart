@@ -61,7 +61,8 @@ class DicomViewerWorkbench extends StatefulWidget {
   State<DicomViewerWorkbench> createState() => _DicomViewerWorkbenchState();
 }
 
-class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
+class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
+    with WidgetsBindingObserver {
   // Pool of 9 controllers for up to 3x3 layout
   late final List<ViewportController> _controllers;
   ViewportLayout _layout = ViewportLayout.oneOnOne;
@@ -89,6 +90,142 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   String? _activeSeriesKey;
   final List<int?> _slotActiveFrameIndex = List.filled(9, null);
 
+  // Dirty tracking for STOW-RS persistence
+  final Set<int> _dirtyFrameIndices = {};
+  bool _isSavingAnnotations = false;
+  String? _lastSaveStatus;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _persistDirtyFrames();
+    }
+  }
+
+  Future<void> _persistDirtyFrames() async {
+    if (_loadedSeries == null || _dirtyFrameIndices.isEmpty || _isSavingAnnotations) {
+      return;
+    }
+    _saveCurrentSlotAnnotations();
+    final framesToSave = Set<int>.from(_dirtyFrameIndices);
+    if (framesToSave.isEmpty) return;
+
+    final studyUid = _loadedSeries!.study?.studyInstanceUID ??
+        _loadedSeries!.series.studyInstanceUID;
+    final seriesUid = _loadedSeries!.series.seriesInstanceUID;
+    if (studyUid.isEmpty) return;
+
+    final client = DicomWebClient(baseUrl: _activeServerUrl);
+    final cache = _seriesAnnotationCache[_computeSeriesKey()] ?? {};
+
+    setState(() {
+      _isSavingAnnotations = true;
+    });
+
+    int savedCount = 0;
+    try {
+      for (final frameIdx in framesToSave) {
+        final annotations = cache[frameIdx] ?? const <DicomAnnotation>[];
+        final frameBuffer = frameIdx < _loadedSeries!.frames.length
+            ? _loadedSeries!.frames[frameIdx]
+            : null;
+        final sopInstanceUid = frameBuffer?.sopInstanceUID ?? 'sop_frame_$frameIdx';
+
+        final gsps = GspsPresentationState(
+          contentLabel: 'WORKBENCH_PERSIST',
+          contentDescription: 'Clinical review marks',
+          contentCreatorName: _annotationControllers[0].activeCreator ?? 'Dr. Radiologist',
+          referencedSopInstanceUid: sopInstanceUid,
+          referencedFrameNumber: frameIdx + 1,
+          annotations: annotations,
+        );
+
+        final part10Bytes = gsps.toDicomPart10Bytes(
+          studyInstanceUid: studyUid,
+          seriesInstanceUid: seriesUid,
+          sopInstanceUid: sopInstanceUid,
+          frameNumber: frameIdx + 1,
+          pixelSpacing: frameBuffer?.pixelSpacing,
+          patientName: _loadedSeries!.study?.patientName,
+          patientId: _loadedSeries!.study?.patientId,
+          accessionNumber: _loadedSeries!.study?.accessionNumber,
+        );
+
+        await client.storePresentationState(
+          studyInstanceUID: studyUid,
+          dicomPart10Bytes: part10Bytes,
+        );
+
+        _dirtyFrameIndices.remove(frameIdx);
+        savedCount++;
+      }
+
+      for (final ac in _annotationControllers) {
+        ac.markClean();
+      }
+
+      if (mounted) {
+        setState(() {
+          _lastSaveStatus = 'Saved $savedCount frame(s) to STOW-RS';
+        });
+      }
+    } catch (e) {
+      print('[WORKBENCH] Failed to persist GSPS: $e');
+      if (mounted) {
+        setState(() {
+          _lastSaveStatus = 'Save failed: $e';
+        });
+      }
+    } finally {
+      client.dispose();
+      if (mounted) {
+        setState(() {
+          _isSavingAnnotations = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchServerPresentationStates(String studyUid) async {
+    final client = DicomWebClient(baseUrl: _activeServerUrl);
+    try {
+      final states = await client.fetchPresentationStates(studyInstanceUID: studyUid);
+      if (states.isEmpty) return;
+
+      final seriesKey = _computeSeriesKey();
+      final cache = _seriesAnnotationCache.putIfAbsent(seriesKey, () => {});
+
+      int restoredCount = 0;
+      for (final gsps in states) {
+        int targetFrame = 0;
+        if (gsps.referencedFrameNumber != null && gsps.referencedFrameNumber! > 0) {
+          targetFrame = gsps.referencedFrameNumber! - 1;
+        } else if (gsps.referencedSopInstanceUid != null && _loadedSeries != null) {
+          final idx = _loadedSeries!.frames.indexWhere(
+            (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+          );
+          if (idx != -1) targetFrame = idx;
+        }
+
+        cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+        restoredCount += gsps.annotations.length;
+      }
+
+      if (mounted) {
+        _restoreSlotAnnotations(seriesKey);
+        setState(() {
+          _lastSaveStatus = 'WADO-RS: Loaded $restoredCount annotation(s)';
+        });
+      }
+    } catch (e) {
+      print('[WORKBENCH] Error fetching presentation states: $e');
+    } finally {
+      client.dispose();
+    }
+  }
+
   String _computeSeriesKey() {
     if (_loadedSeries != null) {
       final studyUid = _loadedSeries!.study?.studyInstanceUID ?? 'unknown_study';
@@ -111,7 +248,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   }
 
   void _restoreSlotAnnotations(String newSeriesKey) {
-    _saveCurrentSlotAnnotations();
+    if (_activeSeriesKey != null && _activeSeriesKey != newSeriesKey) {
+      _saveCurrentSlotAnnotations();
+    }
     _activeSeriesKey = newSeriesKey;
     final cache = _seriesAnnotationCache[newSeriesKey] ?? {};
     final activeSlots = _layout.count;
@@ -144,6 +283,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _activeServerUrl = DicomServerUrlStore.getLastUsedUrl();
 
     _annotationControllers = List.generate(9, (index) {
@@ -152,6 +292,21 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
         activeCreator: 'Dr. Radiologist',
       );
     });
+
+    for (int s = 0; s < 9; s++) {
+      final slot = s;
+      final ac = _annotationControllers[slot];
+      ac.addListener(() {
+        final frameIdx = _slotActiveFrameIndex[slot];
+        if (frameIdx != null && ac.isDirty) {
+          if (!_dirtyFrameIndices.contains(frameIdx)) {
+            setState(() {
+              _dirtyFrameIndices.add(frameIdx);
+            });
+          }
+        }
+      });
+    }
 
     _controllers = List.generate(9, (index) {
       final controller = ViewportController();
@@ -181,6 +336,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _loadedSeries?.dispose();
     for (final c in _controllers) {
       c.dispose();
@@ -192,10 +348,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   }
 
   void _loadCtPhantom() {
+    _persistDirtyFrames();
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
+    _dirtyFrameIndices.clear();
     final frame = SyntheticPatterns.generateCtPhantom();
 
     for (int i = 0; i < _controllers.length; i++) {
@@ -223,10 +381,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   }
 
   void _loadTg18Qc() {
+    _persistDirtyFrames();
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
+    _dirtyFrameIndices.clear();
     final frame = SyntheticPatterns.generateTg18QcPattern();
 
     for (int i = 0; i < _controllers.length; i++) {
@@ -254,10 +414,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   }
 
   void _loadDynamicRamp() {
+    _persistDirtyFrames();
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
     _framePresentationCache.clear();
+    _dirtyFrameIndices.clear();
     final frame = SyntheticPatterns.generateDynamicRamp();
 
     for (int i = 0; i < _controllers.length; i++) {
@@ -287,33 +449,29 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
   Future<void> _openQidoBrowser() async {
     await QidoBrowserDialog.show(
       context,
-      onStudySelected: (study) {
+      onStudySelected: (study) async {
+        if (_loadedSeries != null && _dirtyFrameIndices.isNotEmpty) {
+          await _persistDirtyFrames();
+        }
         _saveCurrentSlotAnnotations();
-        _loadedSeries?.dispose();
-        _loadedSeries = null;
-        _framePresentationCache.clear();
-        for (final c in _controllers) {
-          c.clear();
-        }
-        for (final ac in _annotationControllers) {
-          ac.setAnnotations(const []);
-        }
-        setState(() {
-          _currentFrameIndex = 0;
-          _selectedFixture = 'Loading: ${study.patientName}';
-        });
       },
-      onSeriesLoaded: (seriesBuffer, initialFrame) {
+      onSeriesLoaded: (seriesBuffer, initialFrame) async {
+        if (_loadedSeries != null && _dirtyFrameIndices.isNotEmpty) {
+          await _persistDirtyFrames();
+        }
         _saveCurrentSlotAnnotations();
-        _loadedSeries?.dispose();
+        if (_loadedSeries != null && _loadedSeries != seriesBuffer) {
+          _loadedSeries!.dispose();
+        }
         _framePresentationCache.clear();
+        _dirtyFrameIndices.clear();
         setState(() {
           _loadedSeries = seriesBuffer;
           _currentFrameIndex = 0;
           _selectedFixture = 'QIDO: ${seriesBuffer.series.seriesDescription}';
         });
 
-        _syncGridLayoutFrames();
+        await _syncGridLayoutFrames();
         _restoreSlotAnnotations(_computeSeriesKey());
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -325,6 +483,77 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
             duration: const Duration(seconds: 3),
           ),
         );
+
+        // Retrieve existing presentation states for this study via WADO-RS
+        final studyUid = seriesBuffer.study?.studyInstanceUID ??
+            seriesBuffer.series.studyInstanceUID;
+        if (studyUid.isNotEmpty) {
+          await _fetchServerPresentationStates(studyUid);
+        }
+      },
+      currentLoadedSeries: _loadedSeries,
+      onPresentationStateLoaded: (states, {loadedBuffer, initialFrame}) async {
+        if (loadedBuffer != null) {
+          if (_loadedSeries != null && _dirtyFrameIndices.isNotEmpty) {
+            await _persistDirtyFrames();
+          }
+          _saveCurrentSlotAnnotations();
+          if (_loadedSeries != null && _loadedSeries != loadedBuffer) {
+            _loadedSeries!.dispose();
+          }
+          _framePresentationCache.clear();
+          _dirtyFrameIndices.clear();
+          setState(() {
+            _loadedSeries = loadedBuffer;
+            _currentFrameIndex = 0;
+            _selectedFixture = 'QIDO: ${loadedBuffer.series.seriesDescription}';
+          });
+          await _syncGridLayoutFrames();
+        }
+
+        final seriesKey = _computeSeriesKey();
+        final cache = _seriesAnnotationCache.putIfAbsent(seriesKey, () => {});
+        int restoredCount = 0;
+        int? firstTargetFrame;
+        for (final gsps in states) {
+          int targetFrame = 0;
+          if (gsps.referencedFrameNumber != null &&
+              gsps.referencedFrameNumber! > 0) {
+            targetFrame = gsps.referencedFrameNumber! - 1;
+          } else if (gsps.referencedSopInstanceUid != null &&
+              _loadedSeries != null) {
+            final idx = _loadedSeries!.frames.indexWhere(
+              (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+            );
+            if (idx != -1) targetFrame = idx;
+          }
+          firstTargetFrame ??= targetFrame;
+
+          cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+          restoredCount += gsps.annotations.length;
+        }
+
+        if (firstTargetFrame != null && firstTargetFrame != _currentFrameIndex) {
+          _currentFrameIndex = firstTargetFrame;
+          await _syncGridLayoutFrames();
+        }
+
+        if (mounted) {
+          _restoreSlotAnnotations(seriesKey);
+          setState(() {
+            _lastSaveStatus = 'GSPS Applied: $restoredCount annotation(s)';
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Applied $restoredCount GSPS annotation(s) from server.',
+              ),
+              backgroundColor: const Color(0xFF8957E5),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       },
     );
     if (mounted) {
@@ -456,6 +685,19 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
           ),
         ),
         actions: [
+          if (_loadedSeries != null)
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                await _persistDirtyFrames();
+              },
+              icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+              label: const Text('Store via STOW-RS'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1F6FEB),
+                foregroundColor: Colors.white,
+              ),
+            ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Close'),
@@ -608,6 +850,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
     if (index < 0 || index >= _loadedSeries!.frameCount) return;
 
     _saveCurrentSlotAnnotations();
+
+    // Auto-save departing dirty frames via STOW-RS
+    if (_dirtyFrameIndices.isNotEmpty) {
+      _persistDirtyFrames();
+    }
+
     setState(() {
       _isLoadingFrame = true;
       _currentFrameIndex = index;
@@ -984,6 +1232,74 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench> {
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                 ),
+                const SizedBox(width: 6),
+                ElevatedButton.icon(
+                  onPressed: _isSavingAnnotations || _loadedSeries == null
+                      ? null
+                      : () => _persistDirtyFrames(),
+                  icon: _isSavingAnnotations
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 14,
+                          color: _dirtyFrameIndices.isNotEmpty
+                              ? Colors.white
+                              : const Color(0xFF8B949E),
+                        ),
+                  label: Text(
+                    _isSavingAnnotations
+                        ? 'Saving...'
+                        : _dirtyFrameIndices.isNotEmpty
+                            ? 'Save STOW (${_dirtyFrameIndices.length})'
+                            : 'Save STOW',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _dirtyFrameIndices.isNotEmpty
+                          ? Colors.white
+                          : const Color(0xFF8B949E),
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _dirtyFrameIndices.isNotEmpty
+                        ? const Color(0xFF1F6FEB)
+                        : const Color(0xFF21262D),
+                    side: BorderSide(
+                      color: _dirtyFrameIndices.isNotEmpty
+                          ? const Color(0xFF388BFD)
+                          : const Color(0xFF30363D),
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+                if (_lastSaveStatus != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0x33238636),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0x80238636),
+                      ),
+                    ),
+                    child: Text(
+                      _lastSaveStatus!,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF7EE787),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

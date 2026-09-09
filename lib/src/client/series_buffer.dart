@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dicom_flutter_radiology_kit/src/codecs/codec_router.dart';
 import 'package:dicom_flutter_radiology_kit/src/codecs/decoder_interface.dart';
 import 'package:dicom_flutter_radiology_kit/src/imaging/pixel_frame.dart';
+import '../imaging/pixel_spacing.dart';
 import 'qido_models.dart';
 
 /// Represents a progressive frame event emitted as a series streams over the network.
@@ -39,6 +40,9 @@ class DicomFrameBuffer {
     required this.rawBytes,
     required this.metadata,
   });
+
+  /// Pixel spacing in mm from the instance metadata.
+  PixelSpacing? get pixelSpacing => metadata.pixelSpacing;
 
   /// Decodes this frame into a [PixelFrame] preserving 16-bit scalar pixel buffers.
   Future<PixelFrame> toPixelFrame() async {

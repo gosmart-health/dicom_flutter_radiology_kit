@@ -648,6 +648,117 @@ void main() {
       expect(annotCtrl.selectedAnnotation, isNull);
       expect(annotCtrl.canUndo, isFalse);
     });
+
+    testWidgets('Draws Caliper via click-move-click gesture (two-click placement)',
+        (tester) async {
+      final viewportCtrl = ViewportController();
+      final annotCtrl =
+          AnnotationController(initialTool: AnnotationTool.caliper);
+      final frame = createTestFrame();
+      viewportCtrl.setFrame(frame);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 512,
+                height: 512,
+                child: DicomAnnotationLayer(
+                  viewportController: viewportCtrl,
+                  annotationController: annotCtrl,
+                  inset: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final topLeft = tester.getTopLeft(find.byType(DicomAnnotationLayer));
+
+      // 1. First click down & up at (100, 100) without dragging
+      await tester.tapAt(topLeft + const Offset(100, 100));
+      await tester.pump();
+
+      // Verify draft annotation is active and not committed yet
+      expect(annotCtrl.draftAnnotation, isNotNull);
+      expect(annotCtrl.allAnnotations, isEmpty);
+
+      // 2. Second click at (200, 100)
+      await tester.tapAt(topLeft + const Offset(200, 100));
+      await tester.pump();
+
+      // Caliper should be committed!
+      expect(annotCtrl.allAnnotations.length, equals(1));
+      final caliper = annotCtrl.allAnnotations.first as CaliperAnnotation;
+      expect(caliper.start.dx, closeTo(100.0, 1.0));
+      expect(caliper.start.dy, closeTo(100.0, 1.0));
+      expect(caliper.end.dx, closeTo(200.0, 1.0));
+      expect(caliper.end.dy, closeTo(100.0, 1.0));
+      expect(annotCtrl.activeTool, equals(AnnotationTool.select));
+    });
+
+    testWidgets('Draws Angle via 3 clicks (P1 -> Vertex -> P2) with correct vertices',
+        (tester) async {
+      final viewportCtrl = ViewportController();
+      final annotCtrl =
+          AnnotationController(initialTool: AnnotationTool.angle);
+      final frame = createTestFrame();
+      viewportCtrl.setFrame(frame);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 512,
+                height: 512,
+                child: DicomAnnotationLayer(
+                  viewportController: viewportCtrl,
+                  annotationController: annotCtrl,
+                  inset: EdgeInsets.zero,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final topLeft = tester.getTopLeft(find.byType(DicomAnnotationLayer));
+
+      // Click 1: P1 at (100, 200)
+      await tester.tapAt(topLeft + const Offset(100, 200));
+      await tester.pump();
+      expect(annotCtrl.draftAnnotation, isNotNull);
+      expect(annotCtrl.allAnnotations, isEmpty);
+
+      // Click 2: Vertex at (100, 100)
+      await tester.tapAt(topLeft + const Offset(100, 100));
+      await tester.pump();
+      expect(annotCtrl.draftAnnotation, isNotNull);
+      expect(annotCtrl.allAnnotations, isEmpty);
+
+      // Click 3: P2 at (200, 100)
+      await tester.tapAt(topLeft + const Offset(200, 100));
+      await tester.pump();
+
+      // Angle should be committed!
+      expect(annotCtrl.allAnnotations.length, equals(1));
+      final angle = annotCtrl.allAnnotations.first as AngleAnnotation;
+      expect(angle.p1.dx, closeTo(100.0, 1.0));
+      expect(angle.p1.dy, closeTo(200.0, 1.0));
+      expect(angle.vertex.dx, closeTo(100.0, 1.0));
+      expect(angle.vertex.dy, closeTo(100.0, 1.0));
+      expect(angle.p2.dx, closeTo(200.0, 1.0));
+      expect(angle.p2.dy, closeTo(100.0, 1.0));
+
+      // Arm 1 is vertical (100, 200) -> (100, 100)
+      // Arm 2 is horizontal (100, 100) -> (200, 100)
+      // Angle should be exactly 90.0°
+      expect(angle.computeAngleDegrees(), closeTo(90.0, 0.1));
+      expect(annotCtrl.activeTool, equals(AnnotationTool.select));
+    });
   });
 }
 

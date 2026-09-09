@@ -214,6 +214,21 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
     _drawStartPoint = clampedPt;
 
     if (tool == AnnotationTool.caliper) {
+      if (_drawStartPoint != null &&
+          (clampedPt - _drawStartPoint!).distance >= 3.0) {
+        final ann = CaliperAnnotation(
+          id: 'caliper_${DateTime.now().millisecondsSinceEpoch}',
+          start: _drawStartPoint!,
+          end: clampedPt,
+          creatorName: widget.annotationController.activeCreator,
+        );
+        _drawStartPoint = null;
+        widget.annotationController.setDraftAnnotation(null);
+        widget.annotationController.addAnnotation(ann);
+        widget.annotationController.setActiveTool(AnnotationTool.select);
+        return;
+      }
+      _drawStartPoint = clampedPt;
       final draft = CaliperAnnotation(
         id: 'draft_${DateTime.now().millisecondsSinceEpoch}',
         start: clampedPt,
@@ -222,6 +237,12 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       );
       widget.annotationController.setDraftAnnotation(draft);
     } else if (tool == AnnotationTool.circle) {
+      return;
+    }
+
+    _drawStartPoint = clampedPt;
+
+    if (tool == AnnotationTool.circle) {
       final draft = CircleAnnotation(
         id: 'draft_${DateTime.now().millisecondsSinceEpoch}',
         center: clampedPt,
@@ -243,6 +264,7 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       _multiStepPoints.add(clampedPt);
       if (_multiStepPoints.length == 1) {
         // Vertex defined
+        // P1 defined, cursor moving towards vertex
         final draft = AngleAnnotation(
           id: 'draft_${DateTime.now().millisecondsSinceEpoch}',
           p1: clampedPt,
@@ -253,6 +275,15 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
         widget.annotationController.setDraftAnnotation(draft);
       } else if (_multiStepPoints.length == 2) {
         // P1 defined
+        // Vertex defined, cursor moving towards P2
+        final draft = AngleAnnotation(
+          id: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+          p1: _multiStepPoints[0],
+          vertex: _multiStepPoints[1],
+          p2: clampedPt,
+          creatorName: widget.annotationController.activeCreator,
+        );
+        widget.annotationController.setDraftAnnotation(draft);
       } else if (_multiStepPoints.length >= 3) {
         // P2 defined, commit angle
         final ann = AngleAnnotation(
@@ -427,6 +458,8 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
           id: 'draft_angle',
           p1: clampedPt,
           vertex: _multiStepPoints[0],
+          p1: _multiStepPoints[0],
+          vertex: clampedPt,
           p2: clampedPt,
           creatorName: widget.annotationController.activeCreator,
         );
@@ -485,9 +518,12 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
         );
         widget.annotationController.addAnnotation(ann);
         widget.annotationController.setActiveTool(AnnotationTool.select);
+        _drawStartPoint = null;
+        widget.annotationController.setDraftAnnotation(null);
       }
       _drawStartPoint = null;
       widget.annotationController.setDraftAnnotation(null);
+      // If distance < 3.0, keep _drawStartPoint and draft active for click-to-click placement
     } else if (tool == AnnotationTool.circle && _drawStartPoint != null) {
       final r = (imagePt - _drawStartPoint!).distance;
       if (r >= 3.0) {
@@ -527,6 +563,8 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
     _draggingAnnotation = null;
     _dragLastPoint = null;
     _drawStartPoint = null;
+    _multiStepPoints.clear();
+    widget.annotationController.setDraftAnnotation(null);
     _isDraggingEmptySpace = false;
   }
 
@@ -571,6 +609,12 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       } else if (event.logicalKey == LogicalKeyboardKey.escape) {
         if (_editingTextAnnotation != null) {
           _commitTextEditing();
+          return KeyEventResult.handled;
+        }
+        if (_drawStartPoint != null) {
+          _drawStartPoint = null;
+          widget.annotationController.setDraftAnnotation(null);
+          setState(() {});
           return KeyEventResult.handled;
         }
         if (_multiStepPoints.isNotEmpty) {

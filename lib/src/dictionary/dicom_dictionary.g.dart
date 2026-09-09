@@ -48,7 +48,33 @@ class DicomDictionary {
     final wildcard = _lookupWildcard(normalized, vr: vr);
     if (wildcard != null) return wildcard;
 
-    // 3. Check for Private Tag (Odd group number)
+    // 3. Known Private Application Tags
+    if (normalized == '00790010') {
+      return DicomTagInfo(
+        tag: '(0079,0010)',
+        name: 'Private Creator (GoSmart Health GSPS)',
+        keyword: 'PrivateCreatorGoSmartHealthGsps',
+        valueRepresentation: vr ?? 'LO',
+        valueMultiplicity: '1',
+        retired: 'N',
+        id: normalized,
+        isPrivate: true,
+      );
+    }
+    if (normalized == '00791001') {
+      return DicomTagInfo(
+        tag: '(0079,1001)',
+        name: 'GoSmart Health GSPS Tool Semantics',
+        keyword: 'GoSmartHealthGspsToolSemantics',
+        valueRepresentation: vr ?? 'UT',
+        valueMultiplicity: '1',
+        retired: 'N',
+        id: normalized,
+        isPrivate: true,
+      );
+    }
+
+    // 4. Check for Private Tag (Odd group number)
     final group = int.tryParse(normalized.substring(0, 4), radix: 16);
     final element = int.tryParse(normalized.substring(4, 8), radix: 16);
     if (group != null && group.isOdd) {

@@ -30,6 +30,23 @@ class AnnotationController extends ChangeNotifier {
   final List<List<DicomAnnotation>> _undoStack = [];
   final List<List<DicomAnnotation>> _redoStack = [];
 
+  bool _isDirty = false;
+  bool get isDirty => _isDirty;
+
+  void markClean() {
+    if (_isDirty) {
+      _isDirty = false;
+      notifyListeners();
+    }
+  }
+
+  void markDirty() {
+    if (!_isDirty) {
+      _isDirty = true;
+      notifyListeners();
+    }
+  }
+
   AnnotationController({
     List<DicomAnnotation>? initialAnnotations,
     AnnotationTool initialTool = AnnotationTool.select,
@@ -113,6 +130,7 @@ class AnnotationController extends ChangeNotifier {
 
   void addAnnotation(DicomAnnotation annotation) {
     _recordUndo();
+    _isDirty = true;
     // Attach current active creator if not set
     final effective = annotation.creatorName == null && _activeCreator != null
         ? annotation.copyWith(creatorName: _activeCreator)
@@ -127,6 +145,7 @@ class AnnotationController extends ChangeNotifier {
     final index = _annotations.indexWhere((a) => a.id == updated.id);
     if (index != -1) {
       _recordUndo();
+      _isDirty = true;
       _annotations[index] = updated;
       if (_selectedAnnotation?.id == updated.id) {
         _selectedAnnotation = updated;
@@ -139,6 +158,7 @@ class AnnotationController extends ChangeNotifier {
     final index = _annotations.indexWhere((a) => a.id == id);
     if (index != -1) {
       _recordUndo();
+      _isDirty = true;
       _annotations.removeAt(index);
       if (_selectedAnnotation?.id == id) {
         _selectedAnnotation = null;
@@ -163,6 +183,7 @@ class AnnotationController extends ChangeNotifier {
   void clearAnnotations() {
     if (_annotations.isNotEmpty) {
       _recordUndo();
+      _isDirty = true;
       _annotations.clear();
       _selectedAnnotation = null;
       _draftAnnotation = null;
@@ -172,9 +193,10 @@ class AnnotationController extends ChangeNotifier {
 
   /// Replaces active annotations (e.g. when switching frames, series, or studies).
   /// Resets selection and clears undo/redo stacks.
-  void setAnnotations(List<DicomAnnotation> newAnnotations) {
+  void setAnnotations(List<DicomAnnotation> newAnnotations, {bool isDirty = false}) {
     _annotations.clear();
     _annotations.addAll(newAnnotations);
+    _isDirty = isDirty;
     _selectedAnnotation = null;
     _draftAnnotation = null;
     _undoStack.clear();
@@ -188,6 +210,7 @@ class AnnotationController extends ChangeNotifier {
     final previous = _undoStack.removeLast();
     _annotations.clear();
     _annotations.addAll(previous);
+    _isDirty = true;
     _selectedAnnotation = null;
     _draftAnnotation = null;
     notifyListeners();
@@ -199,6 +222,7 @@ class AnnotationController extends ChangeNotifier {
     final next = _redoStack.removeLast();
     _annotations.clear();
     _annotations.addAll(next);
+    _isDirty = true;
     _selectedAnnotation = null;
     _draftAnnotation = null;
     notifyListeners();
@@ -217,9 +241,17 @@ class AnnotationController extends ChangeNotifier {
     String? contentLabel,
     String? contentDescription,
     String? sopInstanceUid,
+    String? studyInstanceUid,
+    String? seriesInstanceUid,
+    String? referencedSopInstanceUid,
+    int? referencedFrameNumber,
   }) {
     return GspsPresentationState(
       sopInstanceUid: sopInstanceUid,
+      studyInstanceUid: studyInstanceUid,
+      seriesInstanceUid: seriesInstanceUid,
+      referencedSopInstanceUid: referencedSopInstanceUid,
+      referencedFrameNumber: referencedFrameNumber,
       contentLabel: contentLabel ?? 'GSPS_LAYER',
       contentDescription: contentDescription,
       contentCreatorName: _activeCreator,
@@ -237,6 +269,7 @@ class AnnotationController extends ChangeNotifier {
       _annotations.clear();
     }
     _annotations.addAll(gsps.annotations);
+    _isDirty = false;
     _selectedAnnotation = null;
     _draftAnnotation = null;
     notifyListeners();
