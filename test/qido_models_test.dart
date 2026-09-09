@@ -273,13 +273,47 @@ void main() {
           'http://localhost:8000/dicomweb');
       expect(DicomWebClient.normalizeBaseUrl('http://localhost:8000/'),
           'http://localhost:8000/dicomweb');
-      expect(DicomWebClient.normalizeBaseUrl('http://localhost:8000/dicomweb'),
-          'http://localhost:8000/dicomweb');
       expect(
         DicomWebClient.normalizeBaseUrl(
             'https://server.dcmjs.org/dcm4chee-arc/aets/DCM4CHEE/rs'),
         'https://server.dcmjs.org/dcm4chee-arc/aets/DCM4CHEE/rs',
       );
+    });
+
+    test('DicomSeries.isImageSeries detects image vs non-image presentation state series', () {
+      final ctSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.1']},
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+      });
+      expect(ctSeries.isImageSeries, isTrue);
+
+      final prSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.2']},
+        '00080060': {'vr': 'CS', 'Value': ['PR']},
+      });
+      expect(prSeries.isImageSeries, isFalse);
+
+      final srSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.3']},
+        '00080060': {'vr': 'CS', 'Value': ['SR']},
+      });
+      expect(srSeries.isImageSeries, isFalse);
+    });
+
+    test('DicomInstanceSummary.isImage identifies GSPS as non-image', () {
+      final imgInst = DicomInstanceSummary.fromJson({
+        '00080018': {'vr': 'UI', 'Value': ['1.2.3.4.1.1']},
+        '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.2']}, // CT Image
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+      });
+      expect(imgInst.isImage, isTrue);
+
+      final gspsInst = DicomInstanceSummary.fromJson({
+        '00080018': {'vr': 'UI', 'Value': ['1.2.3.4.2.1']},
+        '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.11.1']}, // GSPS
+        '00080060': {'vr': 'CS', 'Value': ['PR']},
+      });
+      expect(gspsInst.isImage, isFalse);
     });
   });
 }

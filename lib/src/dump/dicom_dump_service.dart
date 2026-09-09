@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../dictionary/dicom_dictionary.g.dart';
 import 'dicom_dump_models.dart';
 
@@ -78,8 +79,12 @@ class DicomDumpService {
           }
         }
 
-        final displayVal =
-            formatDisplayValue(val, vr: vr, sequenceItems: seqItems);
+        final displayVal = formatDisplayValue(
+          val,
+          vr: vr,
+          tagHex: tagHex,
+          sequenceItems: seqItems,
+        );
 
         entries.add(
           DicomDumpEntry(
@@ -103,6 +108,7 @@ class DicomDumpService {
   static String formatDisplayValue(
     Map<String, dynamic> element, {
     required String vr,
+    String? tagHex,
     List<List<DicomDumpEntry>>? sequenceItems,
   }) {
     if (sequenceItems != null && sequenceItems.isNotEmpty) {
@@ -125,6 +131,27 @@ class DicomDumpService {
 
     if (val is List) {
       if (val.isEmpty) return '(empty)';
+
+      // Handle GoSmart Health Private Tool Semantics (0079,1001)
+      if (tagHex == '00791001' ||
+          (vr == 'UT' && val.first.toString().trim().startsWith('['))) {
+        try {
+          final decoded = jsonDecode(val.first.toString());
+          if (decoded is List) {
+            final toolCounts = <String, int>{};
+            for (final item in decoded) {
+              if (item is Map) {
+                final type = item['type']?.toString() ?? 'unknown';
+                toolCounts[type] = (toolCounts[type] ?? 0) + 1;
+              }
+            }
+            final summary = toolCounts.entries
+                .map((e) => '${e.value} ${e.key}')
+                .join(', ');
+            return '${decoded.length} Tool(s): $summary';
+          }
+        } catch (_) {}
+      }
 
       // Handle Person Name (PN)
       if (vr == 'PN') {
