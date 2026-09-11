@@ -19,6 +19,10 @@ Drop-in clinical medical imaging kit for Flutter Web (Dart 3+ WasmGC, Skwasm/Can
 
 ## Quick Start
 
+> [!TIP]
+> **Need a lightweight local test DICOM server?**  
+> You may find our [`dicom-py-mock-server`](https://github.com/gosmart-health/dicom-py-mock-server) a quick and easy way to set up a test DICOM server, ready to serve CT and MR cases without the need to launch a full development PACS.
+
 Add `dicom_flutter_radiology_kit` to your `pubspec.yaml`:
 
 ```yaml
