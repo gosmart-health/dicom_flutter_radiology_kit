@@ -903,10 +903,28 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-                                Text(
-                                  '${series.numberOfInstances > 0 ? '${series.numberOfInstances} instance(s)' : (series.modality.toUpperCase() == 'PR' ? 'Presentation State (PR)' : '${series.numberOfInstances} instance(s)')} • Dr. ${series.performingPhysician}',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Color(0xFF8B949E)),
+                                Builder(
+                                  builder: (context) {
+                                    final isPr = series.modality.toUpperCase() == 'PR';
+                                    final dateStr = series.dateTimeIso;
+                                    final dateSuffix = (dateStr != null &&
+                                            dateStr.isNotEmpty &&
+                                            dateStr != '-')
+                                        ? ' • $dateStr'
+                                        : '';
+                                    final countOrType = series.numberOfInstances > 0
+                                        ? (isPr
+                                            ? '${series.numberOfInstances} instance(s) (PR)'
+                                            : '${series.numberOfInstances} instance(s)')
+                                        : (isPr
+                                            ? 'Presentation State (PR)'
+                                            : '${series.numberOfInstances} instance(s)');
+                                    return Text(
+                                      '$countOrType$dateSuffix • Dr. ${series.performingPhysician}',
+                                      style: const TextStyle(
+                                          fontSize: 11, color: Color(0xFF8B949E)),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 8),
                                 SizedBox(

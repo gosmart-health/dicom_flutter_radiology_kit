@@ -281,6 +281,11 @@ class DicomSeries {
   final String seriesDescription;
   final int numberOfInstances;
   final String performingPhysician;
+  final String? presentationCreationDate;
+  final String? presentationCreationTime;
+  final String? presentationCreationDateTimeIso;
+  final String? seriesDate;
+  final String? seriesTime;
   final Map<String, dynamic> rawJson;
 
   const DicomSeries({
@@ -291,6 +296,11 @@ class DicomSeries {
     required this.seriesDescription,
     required this.numberOfInstances,
     required this.performingPhysician,
+    this.presentationCreationDate,
+    this.presentationCreationTime,
+    this.presentationCreationDateTimeIso,
+    this.seriesDate,
+    this.seriesTime,
     required this.rawJson,
   });
 
@@ -300,6 +310,24 @@ class DicomSeries {
       modality.toUpperCase() != 'SR' &&
       modality.toUpperCase() != 'AU' &&
       modality.toUpperCase() != 'DOC';
+
+  /// Formatted ISO datetime string (YYYY-MM-DDTHH:mm:ss) derived from presentation creation or series date/time.
+  String? get dateTimeIso {
+    if (presentationCreationDateTimeIso != null) {
+      return presentationCreationDateTimeIso;
+    }
+    final effectiveDate = presentationCreationDate ?? seriesDate;
+    final effectiveTime = presentationCreationTime ?? seriesTime;
+    if (effectiveDate == null || effectiveDate.isEmpty) return null;
+    return DicomJsonHelper.formatIsoDateTime(effectiveDate, effectiveTime);
+  }
+
+  /// Comparable sort key string (YYYYMMDDHHMMSS) for chronological ordering.
+  String get dateTimeSortKey {
+    final date = presentationCreationDate ?? seriesDate ?? '';
+    final time = presentationCreationTime ?? seriesTime ?? '';
+    return '$date$time';
+  }
 
   factory DicomSeries.fromJson(Map<String, dynamic> json) {
     final seriesInstanceUID = DicomJsonHelper.getString(json, '0020000E') ?? '';
@@ -312,6 +340,25 @@ class DicomSeries {
     final rawPhysician = DicomJsonHelper.getString(json, '00081050');
     final performingPhysician = DicomJsonHelper.formatPersonName(rawPhysician);
 
+    final presentationCreationDate =
+        DicomJsonHelper.getString(json, '00700082') ??
+            DicomJsonHelper.getString(json, '0070,0082');
+    final presentationCreationTime =
+        DicomJsonHelper.getString(json, '00700083') ??
+            DicomJsonHelper.getString(json, '0070,0083');
+    final seriesDate = DicomJsonHelper.getString(json, '00080021') ??
+        DicomJsonHelper.getString(json, '0008,0021');
+    final seriesTime = DicomJsonHelper.getString(json, '00080031') ??
+        DicomJsonHelper.getString(json, '0008,0031');
+
+    final effectiveDate = presentationCreationDate ?? seriesDate;
+    final effectiveTime = presentationCreationTime ?? seriesTime;
+
+    final presentationCreationDateTimeIso =
+        (effectiveDate != null && effectiveDate.isNotEmpty)
+            ? DicomJsonHelper.formatIsoDateTime(effectiveDate, effectiveTime)
+            : null;
+
     return DicomSeries(
       seriesInstanceUID: seriesInstanceUID,
       studyInstanceUID: studyInstanceUID,
@@ -320,6 +367,11 @@ class DicomSeries {
       seriesDescription: seriesDescription,
       numberOfInstances: numberOfInstances,
       performingPhysician: performingPhysician,
+      presentationCreationDate: presentationCreationDate,
+      presentationCreationTime: presentationCreationTime,
+      presentationCreationDateTimeIso: presentationCreationDateTimeIso,
+      seriesDate: seriesDate,
+      seriesTime: seriesTime,
       rawJson: json,
     );
   }

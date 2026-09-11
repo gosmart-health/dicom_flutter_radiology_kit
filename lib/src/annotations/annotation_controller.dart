@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../imaging/presentation_state.dart';
 import '../widgets/viewport_controller.dart';
@@ -301,12 +300,25 @@ class AnnotationController extends ChangeNotifier {
     GspsPresentationState gsps, {
     bool append = false,
     bool applyToViewport = true,
+    int? frameNumber,
   }) {
     _recordUndo();
     if (!append) {
       _annotations.clear();
     }
-    _annotations.addAll(gsps.annotations);
+    List<DicomAnnotation> annsToLoad;
+    if (frameNumber != null && gsps.frameStates.isNotEmpty) {
+      final fs = gsps.frameStates
+          .where((f) => f.referencedFrameNumber == frameNumber)
+          .firstOrNull;
+      annsToLoad = fs?.annotations ??
+          (gsps.frameStates.isNotEmpty ? const [] : gsps.annotations);
+    } else if (gsps.frameStates.isNotEmpty) {
+      annsToLoad = gsps.frameStates.first.annotations;
+    } else {
+      annsToLoad = gsps.annotations;
+    }
+    _annotations.addAll(annsToLoad);
     if (applyToViewport && _attachedViewportController != null) {
       _attachedViewportController!.applyGspsPresentationState(gsps);
     }

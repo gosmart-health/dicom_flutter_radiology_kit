@@ -129,8 +129,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
       _isSavingAnnotations = true;
     });
 
-    int savedCount = 0;
     try {
+      final frameStatesList = <GspsFrameState>[];
+
       for (final frameIdx in framesToSave) {
         final annotations = cache[frameIdx] ?? const <DicomAnnotation>[];
         final frameBuffer = frameIdx < _loadedSeries!.frames.length
@@ -144,15 +145,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
                 ? _controllers[activeSlotIdx].toPresentationState()
                 : null);
 
-        final prSopUid = _framePrSopUidMap[frameIdx] ??
-            GspsDicomEncoder.generateDicomUid();
-        _framePrSopUidMap[frameIdx] = prSopUid;
-
-        final gsps = GspsPresentationState(
-          sopInstanceUid: prSopUid,
-          contentLabel: 'WORKBENCH_PERSIST',
-          contentDescription: 'Clinical review marks',
-          contentCreatorName: _annotationControllers[0].activeCreator ?? 'Dr. Radiologist',
+        frameStatesList.add(GspsFrameState(
           referencedSopInstanceUid: sopInstanceUid,
           referencedFrameNumber: frameIdx + 1,
           windowCenter: presState?.windowCenter,
@@ -161,37 +154,53 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
           zoom: presState?.zoom,
           panOffset: presState?.panOffset,
           annotations: annotations,
-        );
-
-        final part10Bytes = gsps.toDicomPart10Bytes(
-          presentationSopUid: prSopUid,
-          studyInstanceUid: studyUid,
-          seriesInstanceUid: seriesUid,
-          sopInstanceUid: sopInstanceUid,
-          frameNumber: frameIdx + 1,
-          pixelSpacing: frameBuffer?.pixelSpacing,
-          patientName: _loadedSeries!.study?.patientName,
-          patientId: _loadedSeries!.study?.patientId,
-          accessionNumber: _loadedSeries!.study?.accessionNumber,
-        );
-
-        await client.storePresentationState(
-          studyInstanceUID: studyUid,
-          dicomPart10Bytes: part10Bytes,
-          sopInstanceUID: prSopUid,
-        );
-
-        _dirtyFrameIndices.remove(frameIdx);
-        savedCount++;
+        ));
       }
 
+      if (frameStatesList.isEmpty) return;
+
+      final firstSopUid = frameStatesList.first.referencedSopInstanceUid;
+      final prSopUid = GspsDicomEncoder.generateDicomUid();
+
+      final gsps = GspsPresentationState(
+        sopInstanceUid: prSopUid,
+        contentLabel: 'SERIES_GSPS_PERSIST',
+        contentDescription: 'Clinical review marks for series',
+        contentCreatorName: _annotationControllers[0].activeCreator ?? 'Dr. Radiologist',
+        studyInstanceUid: studyUid,
+        seriesInstanceUid: seriesUid,
+        referencedSeriesUid: seriesUid,
+        referencedSopInstanceUid: firstSopUid,
+        frameStates: frameStatesList,
+        annotations: frameStatesList.expand((fs) => fs.annotations).toList(),
+      );
+
+      final part10Bytes = gsps.toDicomPart10Bytes(
+        presentationSopUid: prSopUid,
+        studyInstanceUid: studyUid,
+        seriesInstanceUid: seriesUid,
+        sopInstanceUid: firstSopUid,
+        patientName: _loadedSeries!.study?.patientName,
+        patientId: _loadedSeries!.study?.patientId,
+        accessionNumber: _loadedSeries!.study?.accessionNumber,
+      );
+
+      await client.storePresentationState(
+        studyInstanceUID: studyUid,
+        dicomPart10Bytes: part10Bytes,
+        sopInstanceUID: prSopUid,
+      );
+
+      for (final f in framesToSave) {
+        _dirtyFrameIndices.remove(f);
+      }
       for (final ac in _annotationControllers) {
         ac.markClean();
       }
 
       if (mounted) {
         setState(() {
-          _lastSaveStatus = 'Saved $savedCount frame(s) to STOW-RS';
+          _lastSaveStatus = 'Saved single GSPS file for series (${frameStatesList.length} frame(s)) to STOW-RS';
         });
       }
     } catch (e) {
@@ -222,28 +231,53 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
 
       int restoredCount = 0;
       for (final gsps in states) {
-        int targetFrame = 0;
-        if (gsps.referencedFrameNumber != null && gsps.referencedFrameNumber! > 0) {
-          targetFrame = gsps.referencedFrameNumber! - 1;
-        } else if (gsps.referencedSopInstanceUid != null && _loadedSeries != null) {
-          final idx = _loadedSeries!.frames.indexWhere(
-            (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
-          );
-          if (idx != -1) targetFrame = idx;
-        }
+        if (gsps.frameStates.isNotEmpty) {
+          for (final fs in gsps.frameStates) {
+            int targetFrame = fs.referencedFrameNumber > 0 ? fs.referencedFrameNumber - 1 : 0;
+            if (fs.referencedSopInstanceUid.isNotEmpty && _loadedSeries != null) {
+              final idx = _loadedSeries!.frames.indexWhere(
+                (f) => f.sopInstanceUID == fs.referencedSopInstanceUid,
+              );
+              if (idx != -1) targetFrame = idx;
+            }
+            if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
+              _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+            }
 
-        if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
-          _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
-        }
+            cache[targetFrame] = List<DicomAnnotation>.from(fs.annotations);
+            final presState = fs.toDicomPresentationState();
+            _framePresentationCache[targetFrame] = presState;
+            restoredCount += fs.annotations.length;
 
-        cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
-        final presState = gsps.toDicomPresentationState();
-        _framePresentationCache[targetFrame] = presState;
-        restoredCount += gsps.annotations.length;
+            final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+            if (slotIdx != -1) {
+              _controllers[slotIdx].applyPresentationState(presState);
+            }
+          }
+        } else {
+          int targetFrame = 0;
+          if (gsps.referencedFrameNumber != null && gsps.referencedFrameNumber! > 0) {
+            targetFrame = gsps.referencedFrameNumber! - 1;
+          } else if (gsps.referencedSopInstanceUid != null && _loadedSeries != null) {
+            final idx = _loadedSeries!.frames.indexWhere(
+              (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+            );
+            if (idx != -1) targetFrame = idx;
+          }
 
-        final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
-        if (slotIdx != -1) {
-          _controllers[slotIdx].applyPresentationState(presState);
+          if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
+            _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+          }
+
+          cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+          final presState = gsps.toDicomPresentationState();
+          _framePresentationCache[targetFrame] = presState;
+          restoredCount += gsps.annotations.length;
+
+          final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+          if (slotIdx != -1) {
+            _controllers[slotIdx].applyPresentationState(presState);
+          }
         }
       }
 
@@ -577,31 +611,63 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
         int restoredCount = 0;
         int? firstTargetFrame;
         for (final gsps in states) {
-          int targetFrame = 0;
-          if (gsps.referencedFrameNumber != null &&
-              gsps.referencedFrameNumber! > 0) {
-            targetFrame = gsps.referencedFrameNumber! - 1;
-          } else if (gsps.referencedSopInstanceUid != null &&
-              _loadedSeries != null) {
-            final idx = _loadedSeries!.frames.indexWhere(
-              (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
-            );
-            if (idx != -1) targetFrame = idx;
-          }
-          firstTargetFrame ??= targetFrame;
+          if (gsps.frameStates.isNotEmpty) {
+            for (final fs in gsps.frameStates) {
+              int targetFrame = fs.referencedFrameNumber > 0
+                  ? fs.referencedFrameNumber - 1
+                  : 0;
+              if (fs.referencedSopInstanceUid.isNotEmpty &&
+                  _loadedSeries != null) {
+                final idx = _loadedSeries!.frames.indexWhere(
+                  (f) => f.sopInstanceUID == fs.referencedSopInstanceUid,
+                );
+                if (idx != -1) targetFrame = idx;
+              }
+              firstTargetFrame ??= targetFrame;
 
-          if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
-            _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
-          }
+              if (gsps.sopInstanceUid != null &&
+                  gsps.sopInstanceUid!.isNotEmpty) {
+                _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+              }
 
-          cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
-          final presState = gsps.toDicomPresentationState();
-          _framePresentationCache[targetFrame] = presState;
-          restoredCount += gsps.annotations.length;
+              cache[targetFrame] = List<DicomAnnotation>.from(fs.annotations);
+              final presState = fs.toDicomPresentationState();
+              _framePresentationCache[targetFrame] = presState;
+              restoredCount += fs.annotations.length;
 
-          final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
-          if (slotIdx != -1) {
-            _controllers[slotIdx].applyPresentationState(presState);
+              final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+              if (slotIdx != -1) {
+                _controllers[slotIdx].applyPresentationState(presState);
+              }
+            }
+          } else {
+            int targetFrame = 0;
+            if (gsps.referencedFrameNumber != null &&
+                gsps.referencedFrameNumber! > 0) {
+              targetFrame = gsps.referencedFrameNumber! - 1;
+            } else if (gsps.referencedSopInstanceUid != null &&
+                _loadedSeries != null) {
+              final idx = _loadedSeries!.frames.indexWhere(
+                (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+              );
+              if (idx != -1) targetFrame = idx;
+            }
+            firstTargetFrame ??= targetFrame;
+
+            if (gsps.sopInstanceUid != null &&
+                gsps.sopInstanceUid!.isNotEmpty) {
+              _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+            }
+
+            cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+            final presState = gsps.toDicomPresentationState();
+            _framePresentationCache[targetFrame] = presState;
+            restoredCount += gsps.annotations.length;
+
+            final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+            if (slotIdx != -1) {
+              _controllers[slotIdx].applyPresentationState(presState);
+            }
           }
         }
 
@@ -921,12 +987,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
     if (_loadedSeries == null || _isLoadingFrame) return;
     if (index < 0 || index >= _loadedSeries!.frameCount) return;
 
+    // Keep active frame state and annotations in memory
     _saveCurrentSlotAnnotations();
-
-    // Auto-save departing dirty frames via STOW-RS
-    if (_dirtyFrameIndices.isNotEmpty) {
-      _persistDirtyFrames();
-    }
 
     setState(() {
       _isLoadingFrame = true;

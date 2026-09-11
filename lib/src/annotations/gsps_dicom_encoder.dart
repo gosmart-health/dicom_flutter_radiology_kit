@@ -88,17 +88,24 @@ class GspsDicomEncoder {
 
     // (0008,1115) SQ ReferencedSeriesSequence
     final refSeriesItem = _DicomElementBuilder(isLittleEndian: true);
+    final refImageBytesList = <Uint8List>[];
 
-    // (0008,1140) SQ ReferencedImageSequence inside ReferencedSeriesSequence
-    final refImageItem = _DicomElementBuilder(isLittleEndian: true);
-    refImageItem.writeUi(0x0008, 0x1150, '1.2.840.10008.5.1.4.1.1.2'); // Referenced SOP Class
-    refImageItem.writeUi(0x0008, 0x1155, sopInstanceUid); // Referenced SOP Instance UID
-    if (frameNumber != null && frameNumber > 0) {
-      refImageItem.writeIs(0x0008, 0x1160, frameNumber.toString()); // Referenced Frame Number
+    if (gsps.frameStates.isNotEmpty) {
+      for (final fs in gsps.frameStates) {
+        refImageBytesList.add(_buildReferencedImageItem(
+          sopInstanceUid: fs.referencedSopInstanceUid,
+          frameNumber: fs.referencedFrameNumber,
+        ));
+      }
+    } else {
+      refImageBytesList.add(_buildReferencedImageItem(
+        sopInstanceUid: sopInstanceUid,
+        frameNumber: frameNumber,
+      ));
     }
 
     // In ReferencedSeriesSequence item: (0008,1140) must come before (0020,000E)
-    refSeriesItem.writeSequence(0x0008, 0x1140, [refImageItem.toBytes()]);
+    refSeriesItem.writeSequence(0x0008, 0x1140, refImageBytesList);
     refSeriesItem.writeUi(0x0020, 0x000E, seriesInstanceUid);
     dsBuilder.writeSequence(0x0008, 0x1115, [refSeriesItem.toBytes()]);
 
@@ -115,90 +122,241 @@ class GspsDicomEncoder {
     dsBuilder.writeIs(0x0020, 0x0013, (frameNumber ?? 1).toString()); // Instance Number
 
     // Group 0028: Softcopy VOI LUT Module (0028,3110) & Top-level Window Center (0028,1050) / Width (0028,1051)
-    if (gsps.windowCenter != null && gsps.windowWidth != null) {
-      dsBuilder.writeDs(0x0028, 0x1050, gsps.windowCenter!.toString());
-      dsBuilder.writeDs(0x0028, 0x1051, gsps.windowWidth!.toString());
-      if (gsps.windowCenterWidthExplanation != null &&
-          gsps.windowCenterWidthExplanation!.isNotEmpty) {
-        dsBuilder.writeLo(0x0028, 0x1055, gsps.windowCenterWidthExplanation!);
-      }
+    final topWc = gsps.windowCenter ??
+        (gsps.frameStates.isNotEmpty ? gsps.frameStates.first.windowCenter : null);
+    final topWw = gsps.windowWidth ??
+        (gsps.frameStates.isNotEmpty ? gsps.frameStates.first.windowWidth : null);
+    final topExp = gsps.windowCenterWidthExplanation ??
+        (gsps.frameStates.isNotEmpty
+            ? gsps.frameStates.first.windowCenterWidthExplanation
+            : null);
 
+    if (topWc != null && topWw != null) {
+      dsBuilder.writeDs(0x0028, 0x1050, topWc.toString());
+      dsBuilder.writeDs(0x0028, 0x1051, topWw.toString());
+      if (topExp != null && topExp.isNotEmpty) {
+        dsBuilder.writeLo(0x0028, 0x1055, topExp);
+      }
+    }
+
+    final voiItems = <Uint8List>[];
+    if (gsps.frameStates.isNotEmpty) {
+      for (final fs in gsps.frameStates) {
+        final wc = fs.windowCenter ?? gsps.windowCenter;
+        final ww = fs.windowWidth ?? gsps.windowWidth;
+        final exp = fs.windowCenterWidthExplanation ?? gsps.windowCenterWidthExplanation;
+        if (wc != null && ww != null) {
+          final voiItem = _DicomElementBuilder(isLittleEndian: true);
+          final refImgItem = _buildReferencedImageItem(
+            sopInstanceUid: fs.referencedSopInstanceUid,
+            frameNumber: fs.referencedFrameNumber,
+          );
+          voiItem.writeSequence(0x0008, 0x1140, [refImgItem]);
+          voiItem.writeDs(0x0028, 0x1050, wc.toString());
+          voiItem.writeDs(0x0028, 0x1051, ww.toString());
+          if (exp != null && exp.isNotEmpty) {
+            voiItem.writeLo(0x0028, 0x1055, exp);
+          }
+          voiItems.add(voiItem.toBytes());
+        }
+      }
+    } else if (gsps.windowCenter != null && gsps.windowWidth != null) {
       final voiItem = _DicomElementBuilder(isLittleEndian: true);
-      voiItem.writeDs(0x0028, 0x1050, gsps.windowCenter!.toString()); // Window Center
-      voiItem.writeDs(0x0028, 0x1051, gsps.windowWidth!.toString()); // Window Width
+      final refImgItem = _buildReferencedImageItem(
+        sopInstanceUid: sopInstanceUid,
+        frameNumber: frameNumber,
+      );
+      voiItem.writeSequence(0x0008, 0x1140, [refImgItem]);
+      voiItem.writeDs(0x0028, 0x1050, gsps.windowCenter!.toString());
+      voiItem.writeDs(0x0028, 0x1051, gsps.windowWidth!.toString());
       if (gsps.windowCenterWidthExplanation != null &&
           gsps.windowCenterWidthExplanation!.isNotEmpty) {
         voiItem.writeLo(0x0028, 0x1055, gsps.windowCenterWidthExplanation!);
       }
-      dsBuilder.writeSequence(0x0028, 0x3110, [voiItem.toBytes()]);
+      voiItems.add(voiItem.toBytes());
+    }
+
+    if (voiItems.isNotEmpty) {
+      dsBuilder.writeSequence(0x0028, 0x3110, voiItems);
     }
 
     // Group 0070: Presentation State & Graphic Annotation Modules (strictly ascending tags)
     // 1. (0070,0001) SQ GraphicAnnotationSequence
-    final graphicObjs = gsps.toGraphicObjects();
-    final textObjs = gsps.toTextObjects(
-      includeMeasurementReadouts: true,
-      pixelSpacing: pixelSpacing,
-    );
+    final annotationItems = <Uint8List>[];
 
-    if (graphicObjs.isNotEmpty || textObjs.isNotEmpty) {
-      final annotationItem = _DicomElementBuilder(isLittleEndian: true);
-      annotationItem.writeCs(0x0070, 0x0002, 'LAYER1');
+    if (gsps.frameStates.isNotEmpty) {
+      for (final fs in gsps.frameStates) {
+        final gObjs =
+            GspsPresentationState.annotationsToGraphicObjects(fs.annotations);
+        final tObjs = GspsPresentationState.annotationsToTextObjects(
+          fs.annotations,
+          includeMeasurementReadouts: true,
+          pixelSpacing: pixelSpacing,
+        );
+        if (gObjs.isNotEmpty || tObjs.isNotEmpty) {
+          final annItem = _DicomElementBuilder(isLittleEndian: true);
+          final refImgItem = _buildReferencedImageItem(
+            sopInstanceUid: fs.referencedSopInstanceUid,
+            frameNumber: fs.referencedFrameNumber,
+          );
+          annItem.writeSequence(0x0008, 0x1140, [refImgItem]);
+          annItem.writeCs(0x0070, 0x0002, 'LAYER1');
 
-      // Text Object Sequence (0070,0008) must come before Graphic Object Sequence (0070,0009)
-      if (textObjs.isNotEmpty) {
-        final tItemBytesList = <Uint8List>[];
-        for (final t in textObjs) {
-          final tItem = _DicomElementBuilder(isLittleEndian: true);
-          tItem.writeSt(0x0070, 0x0006, t.unformattedTextValue); // Unformatted Text Value
-          if (t.anchorPoint != null) {
-            tItem.writeFlList(
-              0x0070,
-              0x0014,
-              [t.anchorPoint!.dx, t.anchorPoint!.dy],
-            ); // Anchor Point [col, row]
-            tItem.writeCs(
-              0x0070,
-              0x0015,
-              t.anchorPointVisible ? 'Y' : 'N',
-            ); // Anchor Point Visibility
-            tItem.writeCs(
-              0x0070,
-              0x0016,
-              t.anchorUnits,
-            ); // Anchor Point Annotation Units (PIXEL)
+          if (tObjs.isNotEmpty) {
+            final tItemBytesList = <Uint8List>[];
+            for (final t in tObjs) {
+              final tItem = _DicomElementBuilder(isLittleEndian: true);
+              tItem.writeSt(0x0070, 0x0006, t.unformattedTextValue);
+              if (t.anchorPoint != null) {
+                tItem.writeFlList(
+                  0x0070,
+                  0x0014,
+                  [t.anchorPoint!.dx, t.anchorPoint!.dy],
+                );
+                tItem.writeCs(
+                  0x0070,
+                  0x0015,
+                  t.anchorPointVisible ? 'Y' : 'N',
+                );
+                tItem.writeCs(
+                  0x0070,
+                  0x0016,
+                  t.anchorUnits,
+                );
+              }
+              tItemBytesList.add(tItem.toBytes());
+            }
+            annItem.writeSequence(0x0070, 0x0008, tItemBytesList);
           }
-          tItemBytesList.add(tItem.toBytes());
-        }
-        annotationItem.writeSequence(0x0070, 0x0008, tItemBytesList);
-      }
 
-      // Graphic Object Sequence (0070,0009)
-      if (graphicObjs.isNotEmpty) {
-        final gItemBytesList = <Uint8List>[];
-        for (final g in graphicObjs) {
-          final gItem = _DicomElementBuilder(isLittleEndian: true);
-          gItem.writeCs(0x0070, 0x0020, g.units); // Graphic Annotation Units (PIXEL)
-          gItem.writeUs(0x0070, 0x0021, g.numberOfPoints); // Number of Graphic Points
-          gItem.writeFlList(0x0070, 0x0022, g.graphicData); // Graphic Data
-          gItem.writeCs(0x0070, 0x0023, g.graphicType); // Graphic Type (POLYLINE, CIRCLE, ELLIPSE)
-          gItem.writeCs(0x0070, 0x0024, g.filled ? 'Y' : 'N'); // Graphic Filled
-          gItemBytesList.add(gItem.toBytes());
-        }
-        annotationItem.writeSequence(0x0070, 0x0009, gItemBytesList);
-      }
+          if (gObjs.isNotEmpty) {
+            final gItemBytesList = <Uint8List>[];
+            for (final g in gObjs) {
+              final gItem = _DicomElementBuilder(isLittleEndian: true);
+              gItem.writeCs(0x0070, 0x0020, g.units);
+              gItem.writeUs(0x0070, 0x0021, g.numberOfPoints);
+              gItem.writeFlList(0x0070, 0x0022, g.graphicData);
+              gItem.writeCs(0x0070, 0x0023, g.graphicType);
+              gItem.writeCs(0x0070, 0x0024, g.filled ? 'Y' : 'N');
+              gItemBytesList.add(gItem.toBytes());
+            }
+            annItem.writeSequence(0x0070, 0x0009, gItemBytesList);
+          }
 
-      dsBuilder.writeSequence(0x0070, 0x0001, [annotationItem.toBytes()]);
+          annotationItems.add(annItem.toBytes());
+        }
+      }
+    }
+
+    if (annotationItems.isEmpty) {
+      final gObjs = gsps.toGraphicObjects();
+      final tObjs = gsps.toTextObjects(
+        includeMeasurementReadouts: true,
+        pixelSpacing: pixelSpacing,
+      );
+
+      if (gObjs.isNotEmpty || tObjs.isNotEmpty) {
+        final annItem = _DicomElementBuilder(isLittleEndian: true);
+        final refImgList = <Uint8List>[];
+        if (gsps.frameStates.isNotEmpty) {
+          for (final fs in gsps.frameStates) {
+            refImgList.add(_buildReferencedImageItem(
+              sopInstanceUid: fs.referencedSopInstanceUid,
+              frameNumber: fs.referencedFrameNumber,
+            ));
+          }
+        } else {
+          refImgList.add(_buildReferencedImageItem(
+            sopInstanceUid: sopInstanceUid,
+            frameNumber: frameNumber,
+          ));
+        }
+
+        annItem.writeSequence(0x0008, 0x1140, refImgList);
+        annItem.writeCs(0x0070, 0x0002, 'LAYER1');
+
+        if (tObjs.isNotEmpty) {
+          final tItemBytesList = <Uint8List>[];
+          for (final t in tObjs) {
+            final tItem = _DicomElementBuilder(isLittleEndian: true);
+            tItem.writeSt(0x0070, 0x0006, t.unformattedTextValue);
+            if (t.anchorPoint != null) {
+              tItem.writeFlList(
+                0x0070,
+                0x0014,
+                [t.anchorPoint!.dx, t.anchorPoint!.dy],
+              );
+              tItem.writeCs(
+                0x0070,
+                0x0015,
+                t.anchorPointVisible ? 'Y' : 'N',
+              );
+              tItem.writeCs(
+                0x0070,
+                0x0016,
+                t.anchorUnits,
+              );
+            }
+            tItemBytesList.add(tItem.toBytes());
+          }
+          annItem.writeSequence(0x0070, 0x0008, tItemBytesList);
+        }
+
+        if (gObjs.isNotEmpty) {
+          final gItemBytesList = <Uint8List>[];
+          for (final g in gObjs) {
+            final gItem = _DicomElementBuilder(isLittleEndian: true);
+            gItem.writeCs(0x0070, 0x0020, g.units);
+            gItem.writeUs(0x0070, 0x0021, g.numberOfPoints);
+            gItem.writeFlList(0x0070, 0x0022, g.graphicData);
+            gItem.writeCs(0x0070, 0x0023, g.graphicType);
+            gItem.writeCs(0x0070, 0x0024, g.filled ? 'Y' : 'N');
+            gItemBytesList.add(gItem.toBytes());
+          }
+          annItem.writeSequence(0x0070, 0x0009, gItemBytesList);
+        }
+
+        annotationItems.add(annItem.toBytes());
+      }
+    }
+
+    if (annotationItems.isNotEmpty) {
+      dsBuilder.writeSequence(0x0070, 0x0001, annotationItems);
     }
 
     // 1.5 (0070,005A) SQ DisplayedAreaSelectionSequence
-    final zoomVal = gsps.zoom ?? 1.0;
-    final dispItem = _DicomElementBuilder(isLittleEndian: true);
-    dispItem.writeSlList(0x0070, 0x0052, [1, 1]); // Top Left Corner [1, 1]
-    dispItem.writeSlList(0x0070, 0x0053, [512, 512]); // Bottom Right Corner [512, 512]
-    dispItem.writeCs(0x0070, 0x0100, 'MAGNIFY'); // Presentation Size Mode
-    dispItem.writeFlList(0x0070, 0x0103, [zoomVal]); // Presentation Pixel Magnification Ratio
-    dsBuilder.writeSequence(0x0070, 0x005A, [dispItem.toBytes()]);
+    final dispItems = <Uint8List>[];
+    if (gsps.frameStates.isNotEmpty) {
+      for (final fs in gsps.frameStates) {
+        final zoomVal = fs.zoom ?? gsps.zoom ?? 1.0;
+        final dispItem = _DicomElementBuilder(isLittleEndian: true);
+        final refImgItem = _buildReferencedImageItem(
+          sopInstanceUid: fs.referencedSopInstanceUid,
+          frameNumber: fs.referencedFrameNumber,
+        );
+        dispItem.writeSequence(0x0008, 0x1140, [refImgItem]);
+        dispItem.writeSlList(0x0070, 0x0052, [1, 1]);
+        dispItem.writeSlList(0x0070, 0x0053, [512, 512]);
+        dispItem.writeCs(0x0070, 0x0100, 'MAGNIFY');
+        dispItem.writeFlList(0x0070, 0x0103, [zoomVal]);
+        dispItems.add(dispItem.toBytes());
+      }
+    } else {
+      final zoomVal = gsps.zoom ?? 1.0;
+      final dispItem = _DicomElementBuilder(isLittleEndian: true);
+      final refImgItem = _buildReferencedImageItem(
+        sopInstanceUid: sopInstanceUid,
+        frameNumber: frameNumber,
+      );
+      dispItem.writeSequence(0x0008, 0x1140, [refImgItem]);
+      dispItem.writeSlList(0x0070, 0x0052, [1, 1]);
+      dispItem.writeSlList(0x0070, 0x0053, [512, 512]);
+      dispItem.writeCs(0x0070, 0x0100, 'MAGNIFY');
+      dispItem.writeFlList(0x0070, 0x0103, [zoomVal]);
+      dispItems.add(dispItem.toBytes());
+    }
+
+    dsBuilder.writeSequence(0x0070, 0x005A, dispItems);
 
     // 2. (0070,0060) SQ GraphicLayerSequence
     final layerItem = _DicomElementBuilder(isLittleEndian: true);
@@ -220,6 +378,8 @@ class GspsDicomEncoder {
     // 4. Group 0079: Private Application Semantics (GOSMART_HEALTH_GSPS_V1)
     // Allows high-fidelity reconstruction of interactive tool semantics (Caliper, Angle, VOI LUT, Zoom, Pan, etc.)
     final semanticsPayload = {
+      if (gsps.frameStates.isNotEmpty)
+        'frameStates': gsps.frameStates.map((f) => f.toJson()).toList(),
       if (gsps.windowCenter != null) 'windowCenter': gsps.windowCenter,
       if (gsps.windowWidth != null) 'windowWidth': gsps.windowWidth,
       if (gsps.windowCenterWidthExplanation != null)
@@ -253,6 +413,20 @@ class GspsDicomEncoder {
     fileBuilder.add(datasetBytes);
 
     return fileBuilder.toBytes();
+  }
+
+  static Uint8List _buildReferencedImageItem({
+    required String sopInstanceUid,
+    int? frameNumber,
+    String sopClassUid = '1.2.840.10008.5.1.4.1.1.2',
+  }) {
+    final refImageItem = _DicomElementBuilder(isLittleEndian: true);
+    refImageItem.writeUi(0x0008, 0x1150, sopClassUid);
+    refImageItem.writeUi(0x0008, 0x1155, sopInstanceUid);
+    if (frameNumber != null && frameNumber > 0) {
+      refImageItem.writeIs(0x0008, 0x1160, frameNumber.toString());
+    }
+    return refImageItem.toBytes();
   }
 
   static String _formatDa(DateTime dt) {
