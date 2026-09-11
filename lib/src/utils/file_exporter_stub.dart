@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 
-/// Platform-agnostic file exporter stub for VM / desktop.
+/// Platform-agnostic file exporter stub for non-web fallback.
 class FileExporter {
   static Future<String> exportFile({
     required String content,

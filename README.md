@@ -1,11 +1,11 @@
 # dicom_flutter_radiology_kit
 
-Drop-in clinical medical imaging kit for Flutter Web & Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit).
+Drop-in clinical medical imaging kit for Flutter Web (Dart 3+ WasmGC, Skwasm/CanvasKit).
 
 ---
 
 ## Overview
-`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library built for Flutter applications on web and desktop platforms. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off the main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls and HUD overlays.
+`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering library built exclusively for Flutter Web applications. It provides direct WADO-RS / QIDO-RS DICOMweb streaming, WASM-powered Web Worker codec decoding for JPEG 2000 / HTJ2K off the main UI isolate, dynamic 16-bit scalar VOI LUT transformations, and interactive viewports with gesture controls and HUD overlays.
 
 ---
 
@@ -23,7 +23,7 @@ Add `dicom_flutter_radiology_kit` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  dicom_flutter_radiology_kit: ^0.0.2
+  dicom_flutter_radiology_kit: ^0.0.3
 ```
 
 ### Basic Viewport Usage
@@ -136,8 +136,18 @@ To minimize regulatory friction for downstream medical device integrators seekin
 - **Project Owner:** GoSmart.Health
 - **Contact:** compliance@gosmart.health
 
+### GitHub Resources
+
+We welcome your contributions, sponsorships, questions, and discussions to this open-source project.
+
+- [Source Codes](https://github.com/gosmart-health/dicom_flutter_radiology_kit)
+- [Issues](https://github.com/gosmart-health/dicom_flutter_radiology_kit/issues)
+- [Project Roadmaps](https://github.com/orgs/gosmart-health/projects/1)
+- [Announcements and Discussions](https://github.com/gosmart-health/dicom_flutter_radiology_kit/discussions)
+
 ---
 
 ## License
+
 Apache License 2.0. See [`LICENSE`](./LICENSE) for full details.
 

@@ -2,7 +2,7 @@
 
 **GoSmartHealth DICOM Flutter Radiology Kit (`dicom_flutter_radiology_kit`)**  
 **Document ID:** DCS-GFRK-001  
-**Software Version:** 0.0.2  
+**Software Version:** 0.0.3  
 **Date:** September 2026  
 **Standard Compliance:** NEMA PS 3.2 (DICOM Conformance)  
 
@@ -10,7 +10,7 @@
 
 ## 1. Conformance Statement Overview
 
-The **GoSmartHealth DICOM Flutter Radiology Kit** (`dicom_flutter_radiology_kit`) is a medical imaging software library designed for clinical review, diagnostic workstations, and embedded healthcare web/desktop applications built with Flutter (Dart 3+ WasmGC, Skwasm/CanvasKit). 
+The **GoSmartHealth DICOM Flutter Radiology Kit** (`dicom_flutter_radiology_kit`) is a medical imaging software library designed for clinical review, diagnostic workstations, and embedded healthcare web applications built with Flutter Web (Dart 3+ WasmGC, Skwasm/CanvasKit). 
 
 The application implements a DICOMweb Service Class User (SCU) interface supporting Query/Retrieve via RESTful protocols (**QIDO-RS** and **WADO-RS**) as defined in DICOM PS 3.18 (Web Services). It performs zero-jank frame streaming, offloaded WebAssembly (WASM) decompression for high-bit-depth medical images, dynamic 16-bit scalar Modality/VOI Look-Up Table (LUT) transformations, Grayscale Softcopy Presentation State (GSPS) display and authoring, and precision physical metric measurements.
 
@@ -89,6 +89,7 @@ The application implements a DICOMweb Service Class User (SCU) interface support
 
 | Document Version | Date | Author / Organization | Description of Changes |
 | :--- | :--- | :--- | :--- |
+| **0.0.3** | September 2026 | GoSmartHealth Engineering Team | Added PresentationCreationDate/Time parsing & sort in QIDO PR series, per-frame display state persistence (W/L, Zoom, Pan) in GSPS DICOM Part 10 datasets, fixed multi-frame PR frame restoration, and restricted pub.dev indexing to Flutter Web. |
 | **0.0.2** | September 2026 | GoSmartHealth Engineering Team | Added native DICOM Part 10 GSPS binary encoder, STOW-RS presentation state store capability, QIDO-RS presentation state query and one-click application to viewports. |
 | **0.0.1** | September 2026 | GoSmartHealth Engineering Team | Initial draft covering QIDO-RS, WADO-RS, 16-bit scalar display pipeline, GSPS annotations, and physical metric calibrations. |
 

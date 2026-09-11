@@ -1,21 +1,21 @@
 # DICOM Flutter Radiology Kit — User Guide
 
-Welcome to the `dicom_flutter_radiology_kit` user guide. This guide outlines the multimodal viewport controls, mouse bindings, and touch gestures designed for clinical review workstations on desktop and touch-screen devices (tablets and mobile).
+Welcome to the `dicom_flutter_radiology_kit` user guide. This guide outlines the multimodal viewport controls, mouse bindings, and touch gestures designed for clinical review web applications on desktop browsers and touch-screen devices (tablets and mobile).
 
 ---
 
 ## 1. Viewport Interaction Model
 
 The radiology viewport supports two primary interaction paradigms:
-1. **Desktop Workstation Mode:** Aligned with general industrial PACS conventions, enabling both rapid one-handed mouse operation (crucial when using dictation microphones) and standard keyboard modifier shortcuts.
+1. **Desktop Browser Mode:** Aligned with general industrial PACS conventions, enabling both rapid one-handed mouse operation (crucial when using dictation microphones) and standard keyboard modifier shortcuts.
 2. **Mobile & Tablet Touch Mode:** Built to strictly follow **Apple iOS / iPadOS Human Interface Guidelines (HIG)**, preventing collisions with operating system-level multi-touch gestures (e.g., 3-finger copy/paste/undo on iOS).
 
 ```
  ┌─────────────────────────────────────────────────────────────────────────┐
  │                      Viewport Interaction Modes                         │
  │                                                                         │
- │   Desktop (Mouse & Modifiers)            Mobile & Tablet (Touch)        │
- │   ───────────────────────────            ───────────────────────        │
+ │   Desktop Browser (Mouse & Modifiers)    Mobile & Tablet (Touch)        │
+ │   ───────────────────────────────────    ───────────────────────        │
  │   • Left Drag: Window/Level              • 1-Finger Drag: Win/Level     │
  │   • Right Drag / Shift+Left: Zoom        • 2-Finger Pinch: Smooth Zoom  │
  │   • Middle Drag / Ctrl+Left: Pan         • 2-Finger Drag: Canvas Pan    │
@@ -26,7 +26,7 @@ The radiology viewport supports two primary interaction paradigms:
 
 ---
 
-## 2. Desktop Mouse & Keyboard Controls
+## 2. Desktop Browser Mouse & Keyboard Controls
 
 ### Quick Reference Matrix
 
@@ -40,7 +40,7 @@ The radiology viewport supports two primary interaction paradigms:
 
 ### Design Notes & Clinical PACS Alignment
 - **One-Handed Workflow:** In clinical practice, radiologists often hold a dictation microphone in their non-dominant hand. The ability to perform Window/Level (Left button), Zoom (Right button), and Pan (Middle button) entirely with the mouse eliminates constant keyboard reaching.
-- **Cross-Platform macOS Compatibility:** On macOS, `Ctrl + Left Click` is reserved by the OS as a secondary click (right-click / context menu). On Mac desktops and web browsers, the Pan shortcut automatically recognizes the **Command (`⌘` / Meta)** key in addition to `Ctrl`.
+- **macOS Web Browser Compatibility:** On macOS, `Ctrl + Left Click` is reserved by the OS as a secondary click (right-click / context menu). On Mac web browsers, the Pan shortcut automatically recognizes the **Command (`⌘` / Meta)** key in addition to `Ctrl`.
 
 ---
 
