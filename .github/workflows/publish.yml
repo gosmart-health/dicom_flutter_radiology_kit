@@ -1,0 +1,39 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish Package
+    permissions:
+      id-token: write # Mandatory for pub.dev OIDC automated authentication
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Analyze Package
+        run: flutter analyze
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Validate Publish Dry-Run
+        run: flutter pub publish --dry-run
+
+      - name: Publish to pub.dev
+        uses: dart-lang/setup-dart/publish@v1
