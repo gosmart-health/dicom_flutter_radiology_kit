@@ -37,3 +37,4 @@ jobs:
 
       - name: Publish to pub.dev
         uses: dart-lang/setup-dart/publish@v1
+
