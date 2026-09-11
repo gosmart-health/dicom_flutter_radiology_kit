@@ -132,7 +132,7 @@ class WasmWorkerBridge implements FrameDecoder {
       final numPixels = width * height;
 
       if (byteData == null) {
-        return decodeFrame(encodedBytes, options);
+        return await decodeFrame(encodedBytes, options);
       }
 
       final list = Uint8List(numPixels);
@@ -151,7 +151,7 @@ class WasmWorkerBridge implements FrameDecoder {
         isSigned: false,
       );
     } catch (_) {
-      return decodeFrame(encodedBytes, options);
+      return await decodeFrame(encodedBytes, options);
     }
   }
 
