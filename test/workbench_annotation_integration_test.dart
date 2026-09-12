@@ -209,5 +209,33 @@ void main() {
       // Verify the 5 annotations on CT Phantom were automatically restored!
       expect(layer.annotationController.allAnnotations.length, equals(5));
     });
+
+    testWidgets(
+        'Exporting GSPS in Workbench captures Window/Level, Zoom, and Pan settings',
+        (tester) async {
+      tester.view.physicalSize = const Size(1920, 1080);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(const DicomViewerApp());
+      await tester.pumpAndSettle();
+
+      final layerFinder = find.byType(DicomAnnotationLayer).first;
+      final layer = tester.widget<DicomAnnotationLayer>(layerFinder);
+      final viewportCtrl = layer.viewportController;
+      final annotCtrl = layer.annotationController;
+
+      // Adjust Window/Level and Zoom on viewport
+      viewportCtrl.setWindowLevel(550.0, 1400.0);
+      viewportCtrl.setZoom(2.25);
+      viewportCtrl.setPanOffset(const Offset(35.0, -20.0));
+      await tester.pump();
+
+      final gsps = annotCtrl.toGspsPresentationState();
+      expect(gsps.windowCenter, equals(550.0));
+      expect(gsps.windowWidth, equals(1400.0));
+      expect(gsps.zoom, equals(2.25));
+      expect(gsps.panOffset, equals(const Offset(35.0, -20.0)));
+    });
   });
 }

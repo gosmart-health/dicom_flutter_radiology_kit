@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../imaging/pixel_spacing.dart';
+import '../imaging/presentation_state.dart';
 import 'annotation_model.dart';
 import 'gsps_dicom_encoder.dart';
 
@@ -114,6 +115,86 @@ class GspsTextObject {
   }
 }
 
+/// Per-frame presentation state encapsulation (W/L, Zoom, Pan, annotations, referenced SOP Instance UID).
+class GspsFrameState {
+  final String referencedSopInstanceUid;
+  final int referencedFrameNumber; // 1-indexed
+  final double? windowCenter;
+  final double? windowWidth;
+  final String? windowCenterWidthExplanation;
+  final double? zoom;
+  final Offset? panOffset;
+  final List<DicomAnnotation> annotations;
+
+  GspsFrameState({
+    required this.referencedSopInstanceUid,
+    required this.referencedFrameNumber,
+    this.windowCenter,
+    this.windowWidth,
+    this.windowCenterWidthExplanation,
+    this.zoom,
+    this.panOffset,
+    List<DicomAnnotation> annotations = const [],
+  }) : annotations = List.unmodifiable(annotations);
+
+  DicomPresentationState toDicomPresentationState({
+    double defaultWindowCenter = 40.0,
+    double defaultWindowWidth = 400.0,
+    double defaultZoom = 1.0,
+    Offset defaultPanOffset = Offset.zero,
+    String? presetName,
+  }) {
+    return DicomPresentationState(
+      windowCenter: windowCenter ?? defaultWindowCenter,
+      windowWidth: windowWidth ?? defaultWindowWidth,
+      zoom: zoom ?? defaultZoom,
+      panOffset: panOffset ?? defaultPanOffset,
+      presetName: presetName ?? windowCenterWidthExplanation,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'referencedSopInstanceUid': referencedSopInstanceUid,
+        'referencedFrameNumber': referencedFrameNumber,
+        if (windowCenter != null) 'windowCenter': windowCenter,
+        if (windowWidth != null) 'windowWidth': windowWidth,
+        if (windowCenterWidthExplanation != null)
+          'windowCenterWidthExplanation': windowCenterWidthExplanation,
+        if (zoom != null) 'zoom': zoom,
+        if (panOffset != null) 'panDx': panOffset!.dx,
+        if (panOffset != null) 'panDy': panOffset!.dy,
+        'annotations': annotations.map((a) => a.toJson()).toList(),
+      };
+
+  factory GspsFrameState.fromJson(Map<String, dynamic> json) {
+    Offset? pan;
+    if (json['panDx'] != null || json['panDy'] != null) {
+      pan = Offset(
+        (json['panDx'] as num?)?.toDouble() ?? 0.0,
+        (json['panDy'] as num?)?.toDouble() ?? 0.0,
+      );
+    }
+    final rawAnn = json['annotations'] as List? ?? [];
+    final parsedAnnotations = <DicomAnnotation>[];
+    for (final item in rawAnn) {
+      if (item is Map<String, dynamic>) {
+        final ann = GspsPresentationState._parseAnnotation(item);
+        if (ann != null) parsedAnnotations.add(ann);
+      }
+    }
+    return GspsFrameState(
+      referencedSopInstanceUid: json['referencedSopInstanceUid'] as String? ?? '',
+      referencedFrameNumber: (json['referencedFrameNumber'] as num?)?.toInt() ?? 1,
+      windowCenter: (json['windowCenter'] as num?)?.toDouble(),
+      windowWidth: (json['windowWidth'] as num?)?.toDouble(),
+      windowCenterWidthExplanation: json['windowCenterWidthExplanation'] as String?,
+      zoom: (json['zoom'] as num?)?.toDouble(),
+      panOffset: pan,
+      annotations: parsedAnnotations,
+    );
+  }
+}
+
 /// Container for a complete Presentation State annotation layer.
 /// Directly maps to DICOM PS 3.3 Graphic Annotation Module (C.10.5) & Content Identification.
 class GspsPresentationState {
@@ -127,6 +208,12 @@ class GspsPresentationState {
   final String? referencedSeriesUid;
   final String? referencedSopInstanceUid;
   final int? referencedFrameNumber;
+  final double? windowCenter;
+  final double? windowWidth;
+  final String? windowCenterWidthExplanation;
+  final double? zoom;
+  final Offset? panOffset;
+  final List<GspsFrameState> frameStates;
   final List<DicomAnnotation> annotations;
 
   GspsPresentationState({
@@ -140,12 +227,24 @@ class GspsPresentationState {
     this.referencedSeriesUid,
     this.referencedSopInstanceUid,
     this.referencedFrameNumber,
-    required List<DicomAnnotation> annotations,
+    this.windowCenter,
+    this.windowWidth,
+    this.windowCenterWidthExplanation,
+    this.zoom,
+    this.panOffset,
+    List<GspsFrameState> frameStates = const [],
+    List<DicomAnnotation> annotations = const [],
   })  : creationDateTime = creationDateTime ?? DateTime.now(),
-        annotations = List.unmodifiable(annotations);
+        frameStates = List.unmodifiable(frameStates),
+        annotations = List.unmodifiable(
+          annotations.isNotEmpty
+              ? annotations
+              : frameStates.expand((f) => f.annotations).toList(),
+        );
 
   /// Converts annotations to standard DICOM PS 3.3 Graphic Objects.
-  List<GspsGraphicObject> toGraphicObjects() {
+  static List<GspsGraphicObject> annotationsToGraphicObjects(
+      List<DicomAnnotation> annotations) {
     final list = <GspsGraphicObject>[];
     for (final ann in annotations) {
       if (ann is CaliperAnnotation) {
@@ -209,9 +308,14 @@ class GspsPresentationState {
     return list;
   }
 
+  /// Converts annotations to standard DICOM PS 3.3 Graphic Objects.
+  List<GspsGraphicObject> toGraphicObjects() =>
+      annotationsToGraphicObjects(annotations);
+
   /// Converts text annotations to standard DICOM PS 3.3 Text Objects.
   /// When [includeMeasurementReadouts] is true, also generates companion text readouts for Calipers, Angles, Circles, Ellipses, and Polylines.
-  List<GspsTextObject> toTextObjects({
+  static List<GspsTextObject> annotationsToTextObjects(
+    List<DicomAnnotation> annotations, {
     bool includeMeasurementReadouts = false,
     PixelSpacing? pixelSpacing,
   }) {
@@ -286,6 +390,18 @@ class GspsPresentationState {
     }
     return list;
   }
+
+  /// Converts text annotations to standard DICOM PS 3.3 Text Objects.
+  /// When [includeMeasurementReadouts] is true, also generates companion text readouts for Calipers, Angles, Circles, Ellipses, and Polylines.
+  List<GspsTextObject> toTextObjects({
+    bool includeMeasurementReadouts = false,
+    PixelSpacing? pixelSpacing,
+  }) =>
+      annotationsToTextObjects(
+        annotations,
+        includeMeasurementReadouts: includeMeasurementReadouts,
+        pixelSpacing: pixelSpacing,
+      );
 
   /// Reconstructs annotations from DICOM Graphic and Text Objects.
   static List<DicomAnnotation> fromDicomObjects({
@@ -438,6 +554,23 @@ class GspsPresentationState {
     return result;
   }
 
+  /// Dehydrates presentation parameters (VOI LUT window/level, Zoom, Pan) into a [DicomPresentationState].
+  DicomPresentationState toDicomPresentationState({
+    double defaultWindowCenter = 40.0,
+    double defaultWindowWidth = 400.0,
+    double defaultZoom = 1.0,
+    Offset defaultPanOffset = Offset.zero,
+    String? presetName,
+  }) {
+    return DicomPresentationState(
+      windowCenter: windowCenter ?? defaultWindowCenter,
+      windowWidth: windowWidth ?? defaultWindowWidth,
+      zoom: zoom ?? defaultZoom,
+      panOffset: panOffset ?? defaultPanOffset,
+      presetName: presetName,
+    );
+  }
+
   /// Serializes the presentation state to JSON.
   Map<String, dynamic> toJson() => {
         'sopInstanceUid': sopInstanceUid,
@@ -445,6 +578,15 @@ class GspsPresentationState {
         'contentDescription': contentDescription,
         'contentCreatorName': contentCreatorName,
         'creationDateTime': creationDateTime.toIso8601String(),
+        if (frameStates.isNotEmpty)
+          'frameStates': frameStates.map((f) => f.toJson()).toList(),
+        if (windowCenter != null) 'windowCenter': windowCenter,
+        if (windowWidth != null) 'windowWidth': windowWidth,
+        if (windowCenterWidthExplanation != null)
+          'windowCenterWidthExplanation': windowCenterWidthExplanation,
+        if (zoom != null) 'zoom': zoom,
+        if (panOffset != null) 'panDx': panOffset!.dx,
+        if (panOffset != null) 'panDy': panOffset!.dy,
         'annotations': annotations.map((a) => a.toJson()).toList(),
         'dicomGraphicObjectSequence':
             toGraphicObjects().map((g) => g.toJson()).toList(),
@@ -475,6 +617,15 @@ class GspsPresentationState {
   factory GspsPresentationState.fromJson(Map<String, dynamic> json) {
     final annJsonList = json['annotations'] as List?;
     final annotations = <DicomAnnotation>[];
+    final frameStatesList = <GspsFrameState>[];
+
+    if (json['frameStates'] is List) {
+      for (final raw in json['frameStates'] as List) {
+        if (raw is Map<String, dynamic>) {
+          frameStatesList.add(GspsFrameState.fromJson(raw));
+        }
+      }
+    }
 
     if (annJsonList != null && annJsonList.isNotEmpty) {
       for (final raw in annJsonList) {
@@ -500,18 +651,33 @@ class GspsPresentationState {
       ));
     }
 
+    Offset? pan;
+    if (json['panDx'] != null || json['panDy'] != null) {
+      pan = Offset(
+        (json['panDx'] as num?)?.toDouble() ?? 0.0,
+        (json['panDy'] as num?)?.toDouble() ?? 0.0,
+      );
+    }
+
     return GspsPresentationState(
       sopInstanceUid: json['sopInstanceUid'] as String?,
       studyInstanceUid: json['studyInstanceUid'] as String?,
       seriesInstanceUid: json['seriesInstanceUid'] as String?,
       referencedSopInstanceUid: json['referencedSopInstanceUid'] as String?,
       referencedFrameNumber: json['referencedFrameNumber'] as int?,
+      windowCenter: (json['windowCenter'] as num?)?.toDouble(),
+      windowWidth: (json['windowWidth'] as num?)?.toDouble(),
+      windowCenterWidthExplanation:
+          json['windowCenterWidthExplanation'] as String?,
+      zoom: (json['zoom'] as num?)?.toDouble(),
+      panOffset: pan,
       contentLabel: (json['contentLabel'] as String?) ?? 'GSPS_LAYER',
       contentDescription: json['contentDescription'] as String?,
       contentCreatorName: json['contentCreatorName'] as String?,
       creationDateTime: json['creationDateTime'] != null
           ? DateTime.tryParse(json['creationDateTime'] as String)
           : null,
+      frameStates: frameStatesList,
       annotations: annotations,
     );
   }
@@ -519,8 +685,9 @@ class GspsPresentationState {
   /// Deserializes a Presentation State from standard DICOM Part 18 JSON format
   /// (as returned by WADO-RS `/metadata` or QIDO-RS).
   factory GspsPresentationState.fromDicomJson(Map<String, dynamic> json) {
-    String? getTagStr(String tag) {
-      final obj = json[tag];
+    String? getTagStr(String tag, [Map<String, dynamic>? parentMap]) {
+      final target = parentMap ?? json;
+      final obj = target[tag];
       if (obj is Map && obj.containsKey('Value') && obj['Value'] is List) {
         final list = obj['Value'] as List;
         if (list.isNotEmpty) {
@@ -530,6 +697,20 @@ class GspsPresentationState {
             return first['Alphabetic']?.toString();
           }
           return first?.toString();
+        }
+      }
+      return null;
+    }
+
+    double? getTagDouble(String tag, [Map<String, dynamic>? parentMap]) {
+      final target = parentMap ?? json;
+      final obj = target[tag];
+      if (obj is Map && obj.containsKey('Value') && obj['Value'] is List) {
+        final list = obj['Value'] as List;
+        if (list.isNotEmpty) {
+          final first = list.first;
+          if (first is num) return first.toDouble();
+          if (first is String) return double.tryParse(first);
         }
       }
       return null;
@@ -556,6 +737,36 @@ class GspsPresentationState {
         if (tm.length >= 6) sec = int.tryParse(tm.substring(4, 6)) ?? 0;
       }
       creationDt = DateTime(y, m, d, hr, min, sec);
+    }
+
+    // Extract VOI LUT WindowCenter (0028,1050) & WindowWidth (0028,1051)
+    double? winCenter;
+    double? winWidth;
+    String? winExplanation;
+
+    final softcopyVoiSeq = json['00283110'];
+    if (softcopyVoiSeq is Map && softcopyVoiSeq['Value'] is List) {
+      final list = softcopyVoiSeq['Value'] as List;
+      if (list.isNotEmpty && list.first is Map) {
+        final item = list.first as Map<String, dynamic>;
+        winCenter = getTagDouble('00281050', item);
+        winWidth = getTagDouble('00281051', item);
+        winExplanation = getTagStr('00281055', item);
+      }
+    }
+    winCenter ??= getTagDouble('00281050');
+    winWidth ??= getTagDouble('00281051');
+    winExplanation ??= getTagStr('00281055');
+
+    // Extract Displayed Area Selection Sequence (0070,005A) zoom
+    double? dicomZoom;
+    final dispAreaSeq = json['0070005A'];
+    if (dispAreaSeq is Map && dispAreaSeq['Value'] is List) {
+      final list = dispAreaSeq['Value'] as List;
+      if (list.isNotEmpty && list.first is Map) {
+        final item = list.first as Map<String, dynamic>;
+        dicomZoom = getTagDouble('00700103', item);
+      }
     }
 
     // Extract referenced frame and image context
@@ -664,29 +875,64 @@ class GspsPresentationState {
       if (rawVal is String && rawVal.trim().isNotEmpty) {
         try {
           final decoded = jsonDecode(rawVal);
+          List? rawAnnList;
+          double? privCenter = winCenter;
+          double? privWidth = winWidth;
+          String? privExp = winExplanation;
+          double? privZoom = dicomZoom;
+          Offset? privPan;
           if (decoded is List) {
-            final privateAnnotations = <DicomAnnotation>[];
-            for (final item in decoded) {
-              if (item is Map<String, dynamic>) {
-                final ann = _parseAnnotation(item);
-                if (ann != null) privateAnnotations.add(ann);
-              }
-            }
-            if (privateAnnotations.isNotEmpty) {
-              return GspsPresentationState(
-                sopInstanceUid: sopUid,
-                studyInstanceUid: studyUid,
-                seriesInstanceUid: seriesUid,
-                referencedSeriesUid: refSeriesUid,
-                referencedSopInstanceUid: refSopUid,
-                referencedFrameNumber: refFrame,
-                contentLabel: label,
-                contentDescription: desc,
-                contentCreatorName: creator,
-                creationDateTime: creationDt,
-                annotations: privateAnnotations,
+            rawAnnList = decoded;
+          } else if (decoded is Map<String, dynamic>) {
+            rawAnnList = decoded['annotations'] as List?;
+            privCenter ??= (decoded['windowCenter'] as num?)?.toDouble();
+            privWidth ??= (decoded['windowWidth'] as num?)?.toDouble();
+            privExp ??= decoded['windowCenterWidthExplanation'] as String?;
+            privZoom ??= (decoded['zoom'] as num?)?.toDouble();
+            if (decoded['panDx'] != null || decoded['panDy'] != null) {
+              privPan = Offset(
+                (decoded['panDx'] as num?)?.toDouble() ?? 0.0,
+                (decoded['panDy'] as num?)?.toDouble() ?? 0.0,
               );
             }
+          }
+          List<GspsFrameState> parsedFrameStates = [];
+          if (decoded is Map<String, dynamic> && decoded['frameStates'] is List) {
+            for (final fItem in decoded['frameStates'] as List) {
+              if (fItem is Map<String, dynamic>) {
+                parsedFrameStates.add(GspsFrameState.fromJson(fItem));
+              }
+            }
+          }
+          if (rawAnnList != null || parsedFrameStates.isNotEmpty) {
+            final privateAnnotations = <DicomAnnotation>[];
+            if (rawAnnList != null) {
+              for (final item in rawAnnList) {
+                if (item is Map<String, dynamic>) {
+                  final ann = _parseAnnotation(item);
+                  if (ann != null) privateAnnotations.add(ann);
+                }
+              }
+            }
+            return GspsPresentationState(
+              sopInstanceUid: sopUid,
+              studyInstanceUid: studyUid,
+              seriesInstanceUid: seriesUid,
+              referencedSeriesUid: refSeriesUid,
+              referencedSopInstanceUid: refSopUid,
+              referencedFrameNumber: refFrame,
+              windowCenter: privCenter,
+              windowWidth: privWidth,
+              windowCenterWidthExplanation: privExp,
+              zoom: privZoom,
+              panOffset: privPan,
+              contentLabel: label,
+              contentDescription: desc,
+              contentCreatorName: creator,
+              creationDateTime: creationDt,
+              frameStates: parsedFrameStates,
+              annotations: privateAnnotations,
+            );
           }
         } catch (_) {
           // Fallback to standard DICOM sequence reconstruction
@@ -709,6 +955,10 @@ class GspsPresentationState {
       referencedSeriesUid: refSeriesUid,
       referencedSopInstanceUid: refSopUid,
       referencedFrameNumber: refFrame,
+      windowCenter: winCenter,
+      windowWidth: winWidth,
+      windowCenterWidthExplanation: winExplanation,
+      zoom: dicomZoom,
       contentLabel: label,
       contentDescription: desc,
       contentCreatorName: creator,

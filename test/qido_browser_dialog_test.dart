@@ -1133,4 +1133,145 @@ void main() {
     // Since mockLoadedBuffer already matches the referenced series, loadedBuffer should be null (no re-download)
     expect(capturedBuffer, isNull);
   });
+
+  testWidgets(
+      'QidoBrowserDialog renders PR series creation dates (0070,0082)/(0070,0083) and sorts PR series latest to oldest',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockStudiesResponse = json.encode([
+      {
+        '0020000D': {
+          'vr': 'UI',
+          'Value': ['1.2.840.10008.test.study.prsort']
+        },
+        '00100010': {
+          'vr': 'PN',
+          'Value': [
+            {'Alphabetic': 'PRTEST^PATIENT'}
+          ]
+        },
+        '00100020': {
+          'vr': 'LO',
+          'Value': ['PR-001']
+        },
+        '00080061': {
+          'vr': 'CS',
+          'Value': ['CT', 'PR']
+        },
+        '00081030': {
+          'vr': 'LO',
+          'Value': ['PR SORT STUDY']
+        },
+      }
+    ]);
+
+    // Return two PR series: Older PR1 (10:30:00) and Newer PR2 (16:40:53)
+    final mockSeriesResponse = json.encode([
+      {
+        '0020000D': {
+          'vr': 'UI',
+          'Value': ['1.2.840.10008.test.study.prsort']
+        },
+        '0020000E': {
+          'vr': 'UI',
+          'Value': ['1.2.840.10008.pr.older']
+        },
+        '00080060': {
+          'vr': 'CS',
+          'Value': ['PR']
+        },
+        '00200011': {
+          'vr': 'IS',
+          'Value': [10]
+        },
+        '0008103E': {
+          'vr': 'LO',
+          'Value': ['Older PR Annotations']
+        },
+        '00700082': {
+          'vr': 'DA',
+          'Value': ['20260909']
+        },
+        '00700083': {
+          'vr': 'TM',
+          'Value': ['103000']
+        },
+      },
+      {
+        '0020000D': {
+          'vr': 'UI',
+          'Value': ['1.2.840.10008.test.study.prsort']
+        },
+        '0020000E': {
+          'vr': 'UI',
+          'Value': ['1.2.840.10008.pr.newer']
+        },
+        '00080060': {
+          'vr': 'CS',
+          'Value': ['PR']
+        },
+        '00200011': {
+          'vr': 'IS',
+          'Value': [20]
+        },
+        '0008103E': {
+          'vr': 'LO',
+          'Value': ['Newer PR Annotations']
+        },
+        '00700082': {
+          'vr': 'DA',
+          'Value': ['20260909']
+        },
+        '00700083': {
+          'vr': 'TM',
+          'Value': ['164053']
+        },
+      },
+    ]);
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path.endsWith('/studies')) {
+        return http.Response(mockStudiesResponse, 200,
+            headers: {'content-type': 'application/json'});
+      }
+      if (request.url.path.contains('/series')) {
+        return http.Response(mockSeriesResponse, 200,
+            headers: {'content-type': 'application/json'});
+      }
+      return http.Response('Not found', 404);
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: QidoBrowserDialog(
+            initialServerUrl: 'http://localhost:8000',
+            httpClient: mockClient,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Select the study
+    await tester.tap(find.text('PRTEST, PATIENT'));
+    await tester.pumpAndSettle();
+
+    // Verify date/time strings rendered in UI
+    expect(find.textContaining('2026-09-09T16:40:53'), findsOneWidget);
+    expect(find.textContaining('2026-09-09T10:30:00'), findsOneWidget);
+
+    // Verify ordering: Newer PR Annotations (16:40:53) should appear before Older PR Annotations (10:30:00)
+    final newerFinder = find.text('Series 20: Newer PR Annotations');
+    final olderFinder = find.text('Series 10: Older PR Annotations');
+    expect(newerFinder, findsOneWidget);
+    expect(olderFinder, findsOneWidget);
+
+    final newerPos = tester.getTopLeft(newerFinder).dy;
+    final olderPos = tester.getTopLeft(olderFinder).dy;
+    expect(newerPos, lessThan(olderPos));
+  });
 }

@@ -7,7 +7,7 @@
 ---
 
 ## 1. Executive Summary & Architectural Scope
-`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering kit built for Flutter Web and Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit). This document defines the subsystem decomposition, memory lifecycle, thread isolation boundaries, and data pipelines required for medical image display.
+`dicom_flutter_radiology_kit` is a zero-jank, high-performance DICOM medical image streaming and rendering kit built exclusively for Flutter Web (Dart 3+ WasmGC, Skwasm/CanvasKit). This document defines the subsystem decomposition, memory lifecycle, thread isolation boundaries, and data pipelines required for medical image display.
 
 ---
 

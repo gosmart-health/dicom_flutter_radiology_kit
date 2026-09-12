@@ -128,6 +128,46 @@ void main() {
       expect(series.performingPhysician, 'TAYLOR, RICHARD');
     });
 
+    test('DicomSeries parses PresentationCreationDate (0070,0082) and PresentationCreationTime (0070,0083)', () {
+      final prSeriesJson = {
+        '0020000D': {
+          'vr': 'UI',
+          'Value': ['1.2.3.4.5.6.7']
+        },
+        '0020000E': {
+          'vr': 'UI',
+          'Value': ['1.2.3.4.5.6.7.PR1']
+        },
+        '00080060': {
+          'vr': 'CS',
+          'Value': ['PR']
+        },
+        '00200011': {
+          'vr': 'IS',
+          'Value': [101]
+        },
+        '0008103E': {
+          'vr': 'LO',
+          'Value': ['GSPS PR Annotations']
+        },
+        '00700082': {
+          'vr': 'DA',
+          'Value': ['20260909']
+        },
+        '00700083': {
+          'vr': 'TM',
+          'Value': ['164053']
+        },
+      };
+
+      final series = DicomSeries.fromJson(prSeriesJson);
+      expect(series.presentationCreationDate, '20260909');
+      expect(series.presentationCreationTime, '164053');
+      expect(series.presentationCreationDateTimeIso, '2026-09-09T16:40:53');
+      expect(series.dateTimeIso, '2026-09-09T16:40:53');
+      expect(series.dateTimeSortKey, '20260909164053');
+    });
+
     test('DicomInstanceSummary parses instance metadata tags', () {
       final instanceJson = {
         '00080018': {

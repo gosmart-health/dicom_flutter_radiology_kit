@@ -109,9 +109,34 @@ class DicomWebClient {
     }
 
     final List<dynamic> jsonList = json.decode(response.body);
-    return jsonList
+    final seriesList = jsonList
         .map((item) => DicomSeries.fromJson(item as Map<String, dynamic>))
         .toList();
+
+    seriesList.sort((a, b) {
+      final aIsPr = a.modality.toUpperCase() == 'PR';
+      final bIsPr = b.modality.toUpperCase() == 'PR';
+
+      if (aIsPr && bIsPr) {
+        final keyA = a.dateTimeSortKey;
+        final keyB = b.dateTimeSortKey;
+        if (keyA.isNotEmpty && keyB.isNotEmpty && keyA != keyB) {
+          return keyB.compareTo(keyA); // latest to oldest
+        }
+        return a.seriesNumber.compareTo(b.seriesNumber);
+      }
+      if (aIsPr != bIsPr) {
+        return aIsPr ? 1 : -1;
+      }
+      final keyA = a.dateTimeSortKey;
+      final keyB = b.dateTimeSortKey;
+      if (keyA.isNotEmpty && keyB.isNotEmpty && keyA != keyB) {
+        return keyB.compareTo(keyA);
+      }
+      return a.seriesNumber.compareTo(b.seriesNumber);
+    });
+
+    return seriesList;
   }
 
   /// Queries instance summaries for a series via QIDO-RS `/studies/{studyUID}/series/{seriesUID}/instances`.

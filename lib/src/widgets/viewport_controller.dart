@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../annotations/gsps_codec.dart';
 import '../imaging/pixel_frame.dart';
 import '../imaging/pixel_spacing.dart';
 import '../imaging/presentation_state.dart';
@@ -79,6 +80,30 @@ class ViewportController extends ChangeNotifier {
       _activePreset = null;
     }
     if (notify) {
+      notifyListeners();
+      _dispatchPresentationChanged();
+    }
+  }
+
+  /// Restores viewport VOI LUT (window center & width), zoom, and pan offset parameters from a [GspsPresentationState].
+  void applyGspsPresentationState(GspsPresentationState gsps,
+      {bool notify = true}) {
+    bool changed = false;
+    if (gsps.windowCenter != null && gsps.windowWidth != null) {
+      _windowCenter = gsps.windowCenter!;
+      _windowWidth = gsps.windowWidth! < 1.0 ? 1.0 : gsps.windowWidth!;
+      _activePreset = null;
+      changed = true;
+    }
+    if (gsps.zoom != null) {
+      _zoom = gsps.zoom!.clamp(0.1, 20.0);
+      changed = true;
+    }
+    if (gsps.panOffset != null) {
+      _panOffset = gsps.panOffset!;
+      changed = true;
+    }
+    if (changed && notify) {
       notifyListeners();
       _dispatchPresentationChanged();
     }
@@ -221,6 +246,13 @@ class ViewportController extends ChangeNotifier {
   /// Whether zoom or pan has been customized away from default auto-fit / zero-pan.
   bool get isZoomPanModified =>
       (_zoom - 1.0).abs() > 0.001 || _panOffset != Offset.zero;
+
+  /// Whether window center or width has been customized away from standard defaults.
+  bool get isWindowLevelModified =>
+      (_windowCenter - 40.0).abs() > 0.001 || (_windowWidth - 400.0).abs() > 0.001;
+
+  /// Whether any presentation state parameters (W/L, Zoom, Pan) have been modified.
+  bool get isPresentationModified => isZoomPanModified || isWindowLevelModified;
 
   /// Resets zoom to 1.0 (auto-fit) and panOffset to Offset.zero.
   void resetZoomPan({bool notify = true}) {

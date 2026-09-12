@@ -58,6 +58,7 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
     super.initState();
     widget.viewportController.addListener(_onRebuildNeeded);
     widget.annotationController.addListener(_onRebuildNeeded);
+    widget.annotationController.attachViewportController(widget.viewportController);
   }
 
   @override
@@ -68,13 +69,18 @@ class _DicomAnnotationLayerState extends State<DicomAnnotationLayer> {
       widget.viewportController.addListener(_onRebuildNeeded);
     }
     if (oldWidget.annotationController != widget.annotationController) {
+      oldWidget.annotationController.detachViewportController();
       oldWidget.annotationController.removeListener(_onRebuildNeeded);
       widget.annotationController.addListener(_onRebuildNeeded);
+      widget.annotationController.attachViewportController(widget.viewportController);
+    } else if (oldWidget.viewportController != widget.viewportController) {
+      widget.annotationController.attachViewportController(widget.viewportController);
     }
   }
 
   @override
   void dispose() {
+    widget.annotationController.detachViewportController();
     widget.viewportController.removeListener(_onRebuildNeeded);
     widget.annotationController.removeListener(_onRebuildNeeded);
     _textEditingController.dispose();

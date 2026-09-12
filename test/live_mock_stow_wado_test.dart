@@ -19,13 +19,19 @@ void main() {
       // 1. Query live studies
       final studies = await client.queryStudies();
       expect(studies, isNotEmpty);
-      final study = studies.first;
+      final study = studies.firstWhere(
+        (s) => s.numberOfInstances <= 30,
+        orElse: () => studies.first,
+      );
       print('Target study: ${study.patientName} (${study.studyInstanceUID})');
 
       // 2. Query series
       final seriesList = await client.querySeries(studyInstanceUID: study.studyInstanceUID);
       expect(seriesList, isNotEmpty);
-      final series = seriesList.first;
+      final series = seriesList.firstWhere(
+        (s) => s.numberOfInstances <= 30,
+        orElse: () => seriesList.first,
+      );
       print('Target series: ${series.seriesDescription} (${series.seriesInstanceUID})');
 
       // 3. Query instances
@@ -100,6 +106,6 @@ void main() {
 
       final retrievedText = match.annotations.whereType<TextAnnotation>().first;
       expect(retrievedText.text, equals('Calcification detected'));
-    });
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }

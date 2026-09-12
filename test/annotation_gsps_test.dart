@@ -203,5 +203,91 @@ void main() {
       controller.setFilterCreator(null);
       expect(controller.visibleAnnotations.length, equals(3));
     });
+
+    test('Preserves VOI LUT window/level in GspsPresentationState and dehydrates back onto ViewportController', () {
+      final gsps = GspsPresentationState(
+        contentLabel: 'VOI_TEST',
+        windowCenter: 450.0,
+        windowWidth: 1500.0,
+        windowCenterWidthExplanation: 'Bone Window',
+        annotations: [],
+      );
+
+      expect(gsps.windowCenter, equals(450.0));
+      expect(gsps.windowWidth, equals(1500.0));
+
+      // 1. Verify JSON serialization
+      final jsonMap = gsps.toJson();
+      expect(jsonMap['windowCenter'], equals(450.0));
+      expect(jsonMap['windowWidth'], equals(1500.0));
+      expect(jsonMap['windowCenterWidthExplanation'], equals('Bone Window'));
+
+      final restored = GspsPresentationState.fromJson(jsonMap);
+      expect(restored.windowCenter, equals(450.0));
+      expect(restored.windowWidth, equals(1500.0));
+      expect(restored.windowCenterWidthExplanation, equals('Bone Window'));
+
+      // 2. Verify conversion to DicomPresentationState
+      final dicomState = restored.toDicomPresentationState();
+      expect(dicomState.windowCenter, equals(450.0));
+      expect(dicomState.windowWidth, equals(1500.0));
+
+      // 3. Verify dehydration onto ViewportController
+      final viewportController = ViewportController();
+      expect(viewportController.windowCenter, equals(40.0));
+      expect(viewportController.windowWidth, equals(400.0));
+
+      viewportController.applyGspsPresentationState(restored);
+      expect(viewportController.windowCenter, equals(450.0));
+      expect(viewportController.windowWidth, equals(1500.0));
+    });
+
+    test('Attaching ViewportController auto-marks AnnotationController dirty when W/L or Zoom/Pan changes', () {
+      final annotationController = AnnotationController();
+      final viewportController = ViewportController();
+
+      annotationController.attachViewportController(viewportController);
+      expect(annotationController.isDirty, isFalse);
+
+      // Changing window level on ViewportController marks AnnotationController dirty
+      viewportController.setWindowLevel(500.0, 1200.0);
+      expect(annotationController.isDirty, isTrue);
+
+      annotationController.markClean();
+      expect(annotationController.isDirty, isFalse);
+
+      // Changing zoom on ViewportController marks AnnotationController dirty
+      viewportController.setZoom(2.5);
+      expect(annotationController.isDirty, isTrue);
+
+      // Exporting GSPS includes viewport's window/level and zoom/pan settings
+      final gsps = annotationController.toGspsPresentationState();
+      expect(gsps.windowCenter, equals(500.0));
+      expect(gsps.windowWidth, equals(1200.0));
+      expect(gsps.zoom, equals(2.5));
+    });
+
+    test('Preserves Zoom and Pan in GspsPresentationState and dehydrates back onto ViewportController', () {
+      final gsps = GspsPresentationState(
+        contentLabel: 'ZOOM_PAN_TEST',
+        zoom: 3.5,
+        panOffset: const Offset(120.0, -45.0),
+        annotations: [],
+      );
+
+      final jsonMap = gsps.toJson();
+      expect(jsonMap['zoom'], equals(3.5));
+      expect(jsonMap['panDx'], equals(120.0));
+      expect(jsonMap['panDy'], equals(-45.0));
+
+      final restored = GspsPresentationState.fromJson(jsonMap);
+      expect(restored.zoom, equals(3.5));
+      expect(restored.panOffset, equals(const Offset(120.0, -45.0)));
+
+      final viewportController = ViewportController();
+      viewportController.applyGspsPresentationState(restored);
+      expect(viewportController.zoom, equals(3.5));
+      expect(viewportController.panOffset, equals(const Offset(120.0, -45.0)));
+    });
   });
 }

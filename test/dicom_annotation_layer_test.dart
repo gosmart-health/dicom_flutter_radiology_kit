@@ -40,6 +40,32 @@ void main() {
       expect(find.byType(DicomAnnotationLayer), findsOneWidget);
     });
 
+    testWidgets('Attaches viewportController to annotationController on mount',
+        (tester) async {
+      final viewportCtrl = ViewportController();
+      final annotCtrl = AnnotationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 800,
+              height: 600,
+              child: DicomAnnotationLayer(
+                viewportController: viewportCtrl,
+                annotationController: annotCtrl,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(annotCtrl.isDirty, isFalse);
+
+      viewportCtrl.setWindowLevel(500.0, 1200.0);
+      expect(annotCtrl.isDirty, isTrue);
+    });
+
     testWidgets('Draws Caliper via drag gesture and calculates distance in mm',
         (tester) async {
       final viewportCtrl = ViewportController();

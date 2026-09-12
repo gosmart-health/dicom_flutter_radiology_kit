@@ -5,6 +5,26 @@ All notable changes to `dicom_flutter_radiology_kit` will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2026-09-11
+
+### Added
+- **Presentation Creation Date & Time Support (`(0070,0082)` / `(0070,0083)`)**:
+  - Parsed DICOM tags `(0070,0082)` (`PresentationCreationDate`) and `(0070,0083)` (`PresentationCreationTime`) into `DicomSeries`.
+  - Formatted ISO timestamps (`presentationCreationDateTimeIso`) and generated numerical sort keys (`dateTimeSortKey`).
+  - Enforced latest-to-oldest sorting for PR series returned by `DicomWebClient.querySeries`.
+  - Formatted and rendered creation date and time subtitles on PR series cards in `QidoBrowserDialog`.
+- **Explicit Web Platform Indexing**:
+  - Declared `platforms: web:` in `pubspec.yaml` to restrict pub.dev indexer strictly to Flutter Web.
+
+### Fixed
+- **Multi-Frame GSPS Restoration**:
+  - Fixed multi-frame presentation state loading in `example/lib/main.dart` and `AnnotationController`, ensuring individual frame states map strictly to their referenced frame (`fs.referencedFrameNumber - 1`) rather than aggregating onto Frame 0.
+- **Per-Frame Display State Persistence**:
+  - Preserved per-frame presentation parameters (Window Center, Window Width, Zoom, Pan Offset) in `ViewportController` and serialized them into binary DICOM Part 10 GSPS datasets (`GspsDicomEncoder`) for STOW-RS storage.
+
+### Documentation
+- Updated `README.md`, `doc/dicom_conformance_statement.md`, `doc/design/`, `doc/user_guide/user_guide.md`, `llms.txt`, and package doc comments to specify Flutter Web as the exclusive target platform.
+
 ## [0.0.2] - 2026-09-09
 
 ### Added

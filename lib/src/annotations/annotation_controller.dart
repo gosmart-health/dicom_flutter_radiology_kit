@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../imaging/presentation_state.dart';
+import '../widgets/viewport_controller.dart';
 import 'annotation_model.dart';
 import 'gsps_codec.dart';
 
@@ -32,6 +33,8 @@ class AnnotationController extends ChangeNotifier {
 
   bool _isDirty = false;
   bool get isDirty => _isDirty;
+  ViewportController? _attachedViewportController;
+  ViewportController? get attachedViewportController => _attachedViewportController;
 
   void markClean() {
     if (_isDirty) {
@@ -45,6 +48,25 @@ class AnnotationController extends ChangeNotifier {
       _isDirty = true;
       notifyListeners();
     }
+  }
+
+  /// Attaches a [ViewportController] so presentation parameter changes (W/L, Zoom, Pan)
+  /// automatically mark [isDirty] = true, allowing GSPS presentation state to be saved
+  /// even when no graphic annotations are drawn.
+  void attachViewportController(ViewportController controller) {
+    if (_attachedViewportController == controller) return;
+    _attachedViewportController?.removeListener(_onViewportChanged);
+    _attachedViewportController = controller;
+    _attachedViewportController?.addListener(_onViewportChanged);
+  }
+
+  void detachViewportController() {
+    _attachedViewportController?.removeListener(_onViewportChanged);
+    _attachedViewportController = null;
+  }
+
+  void _onViewportChanged() {
+    markDirty();
   }
 
   AnnotationController({
@@ -245,13 +267,25 @@ class AnnotationController extends ChangeNotifier {
     String? seriesInstanceUid,
     String? referencedSopInstanceUid,
     int? referencedFrameNumber,
+    double? windowCenter,
+    double? windowWidth,
+    String? windowCenterWidthExplanation,
+    double? zoom,
+    Offset? panOffset,
+    DicomPresentationState? presentationState,
   }) {
+    final vp = _attachedViewportController;
     return GspsPresentationState(
       sopInstanceUid: sopInstanceUid,
       studyInstanceUid: studyInstanceUid,
       seriesInstanceUid: seriesInstanceUid,
       referencedSopInstanceUid: referencedSopInstanceUid,
       referencedFrameNumber: referencedFrameNumber,
+      windowCenter: windowCenter ?? presentationState?.windowCenter ?? vp?.windowCenter,
+      windowWidth: windowWidth ?? presentationState?.windowWidth ?? vp?.windowWidth,
+      windowCenterWidthExplanation: windowCenterWidthExplanation,
+      zoom: zoom ?? presentationState?.zoom ?? vp?.zoom,
+      panOffset: panOffset ?? presentationState?.panOffset ?? vp?.panOffset,
       contentLabel: contentLabel ?? 'GSPS_LAYER',
       contentDescription: contentDescription,
       contentCreatorName: _activeCreator,
@@ -259,16 +293,35 @@ class AnnotationController extends ChangeNotifier {
     );
   }
 
-  /// Loads annotations from a DICOM GSPS presentation state.
+  /// Loads annotations and presentation parameters from a DICOM GSPS object.
+  /// When [applyToViewport] is true and a [ViewportController] is attached,
+  /// also dehydrates VOI LUT, Zoom, and Pan settings back onto the viewport.
   void loadGspsPresentationState(
     GspsPresentationState gsps, {
     bool append = false,
+    bool applyToViewport = true,
+    int? frameNumber,
   }) {
     _recordUndo();
     if (!append) {
       _annotations.clear();
     }
-    _annotations.addAll(gsps.annotations);
+    List<DicomAnnotation> annsToLoad;
+    if (frameNumber != null && gsps.frameStates.isNotEmpty) {
+      final fs = gsps.frameStates
+          .where((f) => f.referencedFrameNumber == frameNumber)
+          .firstOrNull;
+      annsToLoad = fs?.annotations ??
+          (gsps.frameStates.isNotEmpty ? const [] : gsps.annotations);
+    } else if (gsps.frameStates.isNotEmpty) {
+      annsToLoad = gsps.frameStates.first.annotations;
+    } else {
+      annsToLoad = gsps.annotations;
+    }
+    _annotations.addAll(annsToLoad);
+    if (applyToViewport && _attachedViewportController != null) {
+      _attachedViewportController!.applyGspsPresentationState(gsps);
+    }
     _isDirty = false;
     _selectedAnnotation = null;
     _draftAnnotation = null;

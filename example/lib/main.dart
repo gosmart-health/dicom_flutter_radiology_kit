@@ -76,8 +76,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
   bool _isLoadingFrame = false;
   late String _activeServerUrl;
 
-  // In-memory persistent presentation states per frame index
-  final Map<int, DicomPresentationState> _framePresentationCache = {};
+  // In-memory persistent presentation states per study/series key and frame index
+  final Map<String, Map<int, DicomPresentationState>> _seriesPresentationCache = {};
+
+  Map<int, DicomPresentationState> get _framePresentationCache =>
+      _seriesPresentationCache.putIfAbsent(_computeSeriesKey(), () => {});
+  final Map<int, String> _framePrSopUidMap = {};
 
   // Annotation controllers pool for up to 9 slots
   late final List<AnnotationController> _annotationControllers;
@@ -93,6 +97,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
   // Dirty tracking for STOW-RS persistence
   final Set<int> _dirtyFrameIndices = {};
   bool _isSavingAnnotations = false;
+  bool _isSyncingFrames = false;
   String? _lastSaveStatus;
 
   @override
@@ -124,8 +129,9 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
       _isSavingAnnotations = true;
     });
 
-    int savedCount = 0;
     try {
+      final frameStatesList = <GspsFrameState>[];
+
       for (final frameIdx in framesToSave) {
         final annotations = cache[frameIdx] ?? const <DicomAnnotation>[];
         final frameBuffer = frameIdx < _loadedSeries!.frames.length
@@ -133,42 +139,68 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
             : null;
         final sopInstanceUid = frameBuffer?.sopInstanceUID ?? 'sop_frame_$frameIdx';
 
-        final gsps = GspsPresentationState(
-          contentLabel: 'WORKBENCH_PERSIST',
-          contentDescription: 'Clinical review marks',
-          contentCreatorName: _annotationControllers[0].activeCreator ?? 'Dr. Radiologist',
+        final activeSlotIdx = _slotActiveFrameIndex.indexOf(frameIdx);
+        final presState = _framePresentationCache[frameIdx] ??
+            (activeSlotIdx != -1
+                ? _controllers[activeSlotIdx].toPresentationState()
+                : null);
+
+        frameStatesList.add(GspsFrameState(
           referencedSopInstanceUid: sopInstanceUid,
           referencedFrameNumber: frameIdx + 1,
+          windowCenter: presState?.windowCenter,
+          windowWidth: presState?.windowWidth,
+          windowCenterWidthExplanation: presState?.presetName,
+          zoom: presState?.zoom,
+          panOffset: presState?.panOffset,
           annotations: annotations,
-        );
-
-        final part10Bytes = gsps.toDicomPart10Bytes(
-          studyInstanceUid: studyUid,
-          seriesInstanceUid: seriesUid,
-          sopInstanceUid: sopInstanceUid,
-          frameNumber: frameIdx + 1,
-          pixelSpacing: frameBuffer?.pixelSpacing,
-          patientName: _loadedSeries!.study?.patientName,
-          patientId: _loadedSeries!.study?.patientId,
-          accessionNumber: _loadedSeries!.study?.accessionNumber,
-        );
-
-        await client.storePresentationState(
-          studyInstanceUID: studyUid,
-          dicomPart10Bytes: part10Bytes,
-        );
-
-        _dirtyFrameIndices.remove(frameIdx);
-        savedCount++;
+        ));
       }
 
+      if (frameStatesList.isEmpty) return;
+
+      final firstSopUid = frameStatesList.first.referencedSopInstanceUid;
+      final prSopUid = GspsDicomEncoder.generateDicomUid();
+
+      final gsps = GspsPresentationState(
+        sopInstanceUid: prSopUid,
+        contentLabel: 'SERIES_GSPS_PERSIST',
+        contentDescription: 'Clinical review marks for series',
+        contentCreatorName: _annotationControllers[0].activeCreator ?? 'Dr. Radiologist',
+        studyInstanceUid: studyUid,
+        seriesInstanceUid: seriesUid,
+        referencedSeriesUid: seriesUid,
+        referencedSopInstanceUid: firstSopUid,
+        frameStates: frameStatesList,
+        annotations: frameStatesList.expand((fs) => fs.annotations).toList(),
+      );
+
+      final part10Bytes = gsps.toDicomPart10Bytes(
+        presentationSopUid: prSopUid,
+        studyInstanceUid: studyUid,
+        seriesInstanceUid: seriesUid,
+        sopInstanceUid: firstSopUid,
+        patientName: _loadedSeries!.study?.patientName,
+        patientId: _loadedSeries!.study?.patientId,
+        accessionNumber: _loadedSeries!.study?.accessionNumber,
+      );
+
+      await client.storePresentationState(
+        studyInstanceUID: studyUid,
+        dicomPart10Bytes: part10Bytes,
+        sopInstanceUID: prSopUid,
+      );
+
+      for (final f in framesToSave) {
+        _dirtyFrameIndices.remove(f);
+      }
       for (final ac in _annotationControllers) {
         ac.markClean();
       }
 
       if (mounted) {
         setState(() {
-          _lastSaveStatus = 'Saved $savedCount frame(s) to STOW-RS';
+          _lastSaveStatus = 'Saved single GSPS file for series (${frameStatesList.length} frame(s)) to STOW-RS';
         });
       }
     } catch (e) {
@@ -199,18 +231,54 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
 
       int restoredCount = 0;
       for (final gsps in states) {
-        int targetFrame = 0;
-        if (gsps.referencedFrameNumber != null && gsps.referencedFrameNumber! > 0) {
-          targetFrame = gsps.referencedFrameNumber! - 1;
-        } else if (gsps.referencedSopInstanceUid != null && _loadedSeries != null) {
-          final idx = _loadedSeries!.frames.indexWhere(
-            (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
-          );
-          if (idx != -1) targetFrame = idx;
-        }
+        if (gsps.frameStates.isNotEmpty) {
+          for (final fs in gsps.frameStates) {
+            int targetFrame = fs.referencedFrameNumber > 0 ? fs.referencedFrameNumber - 1 : 0;
+            if (fs.referencedSopInstanceUid.isNotEmpty && _loadedSeries != null) {
+              final idx = _loadedSeries!.frames.indexWhere(
+                (f) => f.sopInstanceUID == fs.referencedSopInstanceUid,
+              );
+              if (idx != -1) targetFrame = idx;
+            }
+            if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
+              _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+            }
 
-        cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
-        restoredCount += gsps.annotations.length;
+            cache[targetFrame] = List<DicomAnnotation>.from(fs.annotations);
+            final presState = fs.toDicomPresentationState();
+            _framePresentationCache[targetFrame] = presState;
+            restoredCount += fs.annotations.length;
+
+            final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+            if (slotIdx != -1) {
+              _controllers[slotIdx].applyPresentationState(presState);
+            }
+          }
+        } else {
+          int targetFrame = 0;
+          if (gsps.referencedFrameNumber != null && gsps.referencedFrameNumber! > 0) {
+            targetFrame = gsps.referencedFrameNumber! - 1;
+          } else if (gsps.referencedSopInstanceUid != null && _loadedSeries != null) {
+            final idx = _loadedSeries!.frames.indexWhere(
+              (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+            );
+            if (idx != -1) targetFrame = idx;
+          }
+
+          if (gsps.sopInstanceUid != null && gsps.sopInstanceUid!.isNotEmpty) {
+            _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+          }
+
+          cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+          final presState = gsps.toDicomPresentationState();
+          _framePresentationCache[targetFrame] = presState;
+          restoredCount += gsps.annotations.length;
+
+          final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+          if (slotIdx != -1) {
+            _controllers[slotIdx].applyPresentationState(presState);
+          }
+        }
       }
 
       if (mounted) {
@@ -243,14 +311,12 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
       if (frameIdx != null) {
         cache[frameIdx] =
             List<DicomAnnotation>.from(_annotationControllers[s].allAnnotations);
+        _framePresentationCache[frameIdx] = _controllers[s].toPresentationState();
       }
     }
   }
 
   void _restoreSlotAnnotations(String newSeriesKey) {
-    if (_activeSeriesKey != null && _activeSeriesKey != newSeriesKey) {
-      _saveCurrentSlotAnnotations();
-    }
     _activeSeriesKey = newSeriesKey;
     final cache = _seriesAnnotationCache[newSeriesKey] ?? {};
     final activeSlots = _layout.count;
@@ -267,6 +333,11 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
         _annotationControllers[s].setAnnotations(saved);
         _annotationControllers[s].setActiveTool(_activeTool);
         _annotationControllers[s].setFilterCreator(_collaboratorFilter);
+
+        final presState = _framePresentationCache[frameIdx];
+        if (presState != null) {
+          _controllers[s].applyPresentationState(presState, notify: false);
+        }
       } else {
         _slotActiveFrameIndex[s] = null;
         _annotationControllers[s].setAnnotations(const <DicomAnnotation>[]);
@@ -322,9 +393,16 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
 
       // Live propagation hook: save presentation state per frame
       controller.onPresentationChanged = (state) {
+        if (_isSyncingFrames) return;
         final frameNum = controller.frameIndex;
         if (frameNum != null && frameNum > 0) {
-          _framePresentationCache[frameNum - 1] = state;
+          final frameIdx = frameNum - 1;
+          _framePresentationCache[frameIdx] = state;
+          if (!_dirtyFrameIndices.contains(frameIdx)) {
+            setState(() {
+              _dirtyFrameIndices.add(frameIdx);
+            });
+          }
         }
       };
 
@@ -352,32 +430,37 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
-    _framePresentationCache.clear();
+    _framePrSopUidMap.clear();
     _dirtyFrameIndices.clear();
-    final frame = SyntheticPatterns.generateCtPhantom();
+    _isSyncingFrames = true;
+    try {
+      final frame = SyntheticPatterns.generateCtPhantom();
 
-    for (int i = 0; i < _controllers.length; i++) {
-      if (i == 0) {
-        _controllers[i].resetZoomPan(notify: false);
-        _controllers[i].setFrame(frame);
-        _controllers[i].applyPreset(WindowPresets.softTissue);
-        _controllers[i].updateMetadata(
-          patientName: 'DOE^JOHN',
-          patientId: 'SYN-CT-90210',
-          studyDescription: 'CT THORAX W/ CONTRAST',
-          seriesDescription: 'AXIAL 5.0mm SOFT TISSUE',
-          frameIndex: 1,
-          totalFrames: 1,
-        );
-      } else {
-        _controllers[i].clear();
+      for (int i = 0; i < _controllers.length; i++) {
+        if (i == 0) {
+          _controllers[i].resetZoomPan(notify: false);
+          _controllers[i].setFrame(frame);
+          _controllers[i].applyPreset(WindowPresets.softTissue);
+          _controllers[i].updateMetadata(
+            patientName: 'DOE^JOHN',
+            patientId: 'SYN-CT-90210',
+            studyDescription: 'CT THORAX W/ CONTRAST',
+            seriesDescription: 'AXIAL 5.0mm SOFT TISSUE',
+            frameIndex: 1,
+            totalFrames: 1,
+          );
+        } else {
+          _controllers[i].clear();
+        }
       }
+      setState(() {
+        _currentFrameIndex = 0;
+        _selectedFixture = 'CT Phantom';
+      });
+      _restoreSlotAnnotations('fixture:CT Phantom');
+    } finally {
+      _isSyncingFrames = false;
     }
-    setState(() {
-      _currentFrameIndex = 0;
-      _selectedFixture = 'CT Phantom';
-    });
-    _restoreSlotAnnotations('fixture:CT Phantom');
   }
 
   void _loadTg18Qc() {
@@ -385,32 +468,37 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
-    _framePresentationCache.clear();
+    _framePrSopUidMap.clear();
     _dirtyFrameIndices.clear();
-    final frame = SyntheticPatterns.generateTg18QcPattern();
+    _isSyncingFrames = true;
+    try {
+      final frame = SyntheticPatterns.generateTg18QcPattern();
 
-    for (int i = 0; i < _controllers.length; i++) {
-      if (i == 0) {
-        _controllers[i].resetZoomPan(notify: false);
-        _controllers[i].setFrame(frame);
-        _controllers[i].setWindowLevel(2048, 4096);
-        _controllers[i].updateMetadata(
-          patientName: 'QUALITY^CONTROL',
-          patientId: 'QC-TG18-001',
-          studyDescription: 'TG18-QC DISPLAY CALIBRATION',
-          seriesDescription: 'SMPTE DYNAMIC RANGE TEST',
-          frameIndex: 1,
-          totalFrames: 1,
-        );
-      } else {
-        _controllers[i].clear();
+      for (int i = 0; i < _controllers.length; i++) {
+        if (i == 0) {
+          _controllers[i].resetZoomPan(notify: false);
+          _controllers[i].setFrame(frame);
+          _controllers[i].setWindowLevel(2048, 4096);
+          _controllers[i].updateMetadata(
+            patientName: 'QUALITY^CONTROL',
+            patientId: 'QC-TG18-001',
+            studyDescription: 'TG18-QC DISPLAY CALIBRATION',
+            seriesDescription: 'SMPTE DYNAMIC RANGE TEST',
+            frameIndex: 1,
+            totalFrames: 1,
+          );
+        } else {
+          _controllers[i].clear();
+        }
       }
+      setState(() {
+        _currentFrameIndex = 0;
+        _selectedFixture = 'TG18-QC Test Pattern';
+      });
+      _restoreSlotAnnotations('fixture:TG18-QC Test Pattern');
+    } finally {
+      _isSyncingFrames = false;
     }
-    setState(() {
-      _currentFrameIndex = 0;
-      _selectedFixture = 'TG18-QC Test Pattern';
-    });
-    _restoreSlotAnnotations('fixture:TG18-QC Test Pattern');
   }
 
   void _loadDynamicRamp() {
@@ -418,32 +506,37 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
     _saveCurrentSlotAnnotations();
     _loadedSeries?.dispose();
     _loadedSeries = null;
-    _framePresentationCache.clear();
+    _framePrSopUidMap.clear();
     _dirtyFrameIndices.clear();
-    final frame = SyntheticPatterns.generateDynamicRamp();
+    _isSyncingFrames = true;
+    try {
+      final frame = SyntheticPatterns.generateDynamicRamp();
 
-    for (int i = 0; i < _controllers.length; i++) {
-      if (i == 0) {
-        _controllers[i].resetZoomPan(notify: false);
-        _controllers[i].setFrame(frame);
-        _controllers[i].setWindowLevel(250, 2500);
-        _controllers[i].updateMetadata(
-          patientName: 'CALIBRATION^RAMP',
-          patientId: 'RAMP-16BIT-002',
-          studyDescription: 'CONTINUOUS 16-BIT HU GRADIENT',
-          seriesDescription: '-1000 HU TO +2500 HU RAMP',
-          frameIndex: 1,
-          totalFrames: 1,
-        );
-      } else {
-        _controllers[i].clear();
+      for (int i = 0; i < _controllers.length; i++) {
+        if (i == 0) {
+          _controllers[i].resetZoomPan(notify: false);
+          _controllers[i].setFrame(frame);
+          _controllers[i].setWindowLevel(250, 2500);
+          _controllers[i].updateMetadata(
+            patientName: 'CALIBRATION^RAMP',
+            patientId: 'RAMP-16BIT-002',
+            studyDescription: 'CONTINUOUS 16-BIT HU GRADIENT',
+            seriesDescription: '-1000 HU TO +2500 HU RAMP',
+            frameIndex: 1,
+            totalFrames: 1,
+          );
+        } else {
+          _controllers[i].clear();
+        }
       }
+      setState(() {
+        _currentFrameIndex = 0;
+        _selectedFixture = 'Dynamic Ramp';
+      });
+      _restoreSlotAnnotations('fixture:Dynamic Ramp');
+    } finally {
+      _isSyncingFrames = false;
     }
-    setState(() {
-      _currentFrameIndex = 0;
-      _selectedFixture = 'Dynamic Ramp';
-    });
-    _restoreSlotAnnotations('fixture:Dynamic Ramp');
   }
 
   Future<void> _openQidoBrowser() async {
@@ -464,6 +557,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
           _loadedSeries!.dispose();
         }
         _framePresentationCache.clear();
+        _framePrSopUidMap.clear();
         _dirtyFrameIndices.clear();
         setState(() {
           _loadedSeries = seriesBuffer;
@@ -502,6 +596,7 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
             _loadedSeries!.dispose();
           }
           _framePresentationCache.clear();
+          _framePrSopUidMap.clear();
           _dirtyFrameIndices.clear();
           setState(() {
             _loadedSeries = loadedBuffer;
@@ -516,21 +611,64 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
         int restoredCount = 0;
         int? firstTargetFrame;
         for (final gsps in states) {
-          int targetFrame = 0;
-          if (gsps.referencedFrameNumber != null &&
-              gsps.referencedFrameNumber! > 0) {
-            targetFrame = gsps.referencedFrameNumber! - 1;
-          } else if (gsps.referencedSopInstanceUid != null &&
-              _loadedSeries != null) {
-            final idx = _loadedSeries!.frames.indexWhere(
-              (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
-            );
-            if (idx != -1) targetFrame = idx;
-          }
-          firstTargetFrame ??= targetFrame;
+          if (gsps.frameStates.isNotEmpty) {
+            for (final fs in gsps.frameStates) {
+              int targetFrame = fs.referencedFrameNumber > 0
+                  ? fs.referencedFrameNumber - 1
+                  : 0;
+              if (fs.referencedSopInstanceUid.isNotEmpty &&
+                  _loadedSeries != null) {
+                final idx = _loadedSeries!.frames.indexWhere(
+                  (f) => f.sopInstanceUID == fs.referencedSopInstanceUid,
+                );
+                if (idx != -1) targetFrame = idx;
+              }
+              firstTargetFrame ??= targetFrame;
 
-          cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
-          restoredCount += gsps.annotations.length;
+              if (gsps.sopInstanceUid != null &&
+                  gsps.sopInstanceUid!.isNotEmpty) {
+                _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+              }
+
+              cache[targetFrame] = List<DicomAnnotation>.from(fs.annotations);
+              final presState = fs.toDicomPresentationState();
+              _framePresentationCache[targetFrame] = presState;
+              restoredCount += fs.annotations.length;
+
+              final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+              if (slotIdx != -1) {
+                _controllers[slotIdx].applyPresentationState(presState);
+              }
+            }
+          } else {
+            int targetFrame = 0;
+            if (gsps.referencedFrameNumber != null &&
+                gsps.referencedFrameNumber! > 0) {
+              targetFrame = gsps.referencedFrameNumber! - 1;
+            } else if (gsps.referencedSopInstanceUid != null &&
+                _loadedSeries != null) {
+              final idx = _loadedSeries!.frames.indexWhere(
+                (f) => f.sopInstanceUID == gsps.referencedSopInstanceUid,
+              );
+              if (idx != -1) targetFrame = idx;
+            }
+            firstTargetFrame ??= targetFrame;
+
+            if (gsps.sopInstanceUid != null &&
+                gsps.sopInstanceUid!.isNotEmpty) {
+              _framePrSopUidMap[targetFrame] = gsps.sopInstanceUid!;
+            }
+
+            cache[targetFrame] = List<DicomAnnotation>.from(gsps.annotations);
+            final presState = gsps.toDicomPresentationState();
+            _framePresentationCache[targetFrame] = presState;
+            restoredCount += gsps.annotations.length;
+
+            final slotIdx = _slotActiveFrameIndex.indexOf(targetFrame);
+            if (slotIdx != -1) {
+              _controllers[slotIdx].applyPresentationState(presState);
+            }
+          }
         }
 
         if (firstTargetFrame != null && firstTargetFrame != _currentFrameIndex) {
@@ -849,12 +987,8 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
     if (_loadedSeries == null || _isLoadingFrame) return;
     if (index < 0 || index >= _loadedSeries!.frameCount) return;
 
+    // Keep active frame state and annotations in memory
     _saveCurrentSlotAnnotations();
-
-    // Auto-save departing dirty frames via STOW-RS
-    if (_dirtyFrameIndices.isNotEmpty) {
-      _persistDirtyFrames();
-    }
 
     setState(() {
       _isLoadingFrame = true;
@@ -874,78 +1008,83 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
   /// Synchronizes frame decoding and presentation states across all active grid slots.
   Future<void> _syncGridLayoutFrames() async {
     if (_loadedSeries == null) return;
+    _isSyncingFrames = true;
 
-    final totalCount = _loadedSeries!.frameCount;
-    final activeSlots = _layout.count;
+    try {
+      final totalCount = _loadedSeries!.frameCount;
+      final activeSlots = _layout.count;
 
-    for (int slot = 0; slot < 9; slot++) {
-      final controller = _controllers[slot];
-      if (slot < activeSlots) {
-        final frameIdx = _currentFrameIndex + slot;
-        if (frameIdx < totalCount) {
-          final pixelFrame = await _loadedSeries!.getPixelFrame(frameIdx);
-          if (pixelFrame != null && mounted) {
-            // Apply or restore per-frame presentation state
-            final cachedState = _framePresentationCache[frameIdx];
-            if (cachedState != null) {
-              controller.applyPresentationState(cachedState, notify: false);
-              controller.setFrame(pixelFrame,
-                  updateWindowLevelFromFrame: false);
-            } else {
-              controller.resetZoomPan(notify: false);
-              final is8Bit = pixelFrame.bitsAllocated <= 8 ||
-                  pixelFrame.rawPixels is Uint8List;
-              if (is8Bit) {
-                controller.setWindowLevel(128.0, 256.0);
+      for (int slot = 0; slot < 9; slot++) {
+        final controller = _controllers[slot];
+        if (slot < activeSlots) {
+          final frameIdx = _currentFrameIndex + slot;
+          if (frameIdx < totalCount) {
+            final pixelFrame = await _loadedSeries!.getPixelFrame(frameIdx);
+            if (pixelFrame != null && mounted) {
+              controller.updateMetadata(
+                patientName: _loadedSeries!.study?.patientName ?? 'Anonymous',
+                patientId: _loadedSeries!.study?.patientId ?? '-',
+                studyDescription:
+                    _loadedSeries!.study?.studyDescription ?? 'DICOM Study',
+                seriesDescription: _loadedSeries!.series.seriesDescription,
+                frameIndex: frameIdx + 1,
+                totalFrames: totalCount,
+                pixelSpacing: pixelFrame.pixelSpacing,
+              );
+
+              // Apply or restore per-frame presentation state
+              final cachedState = _framePresentationCache[frameIdx];
+              if (cachedState != null) {
+                controller.applyPresentationState(cachedState, notify: false);
                 controller.setFrame(pixelFrame,
                     updateWindowLevelFromFrame: false);
               } else {
-                final metaCenter = _loadedSeries!.frames.isNotEmpty
-                    ? _loadedSeries!
-                        .frames[frameIdx < _loadedSeries!.frames.length
-                            ? frameIdx
-                            : 0]
-                        .metadata
-                        .windowCenter
-                    : null;
-                final metaWidth = _loadedSeries!.frames.isNotEmpty
-                    ? _loadedSeries!
-                        .frames[frameIdx < _loadedSeries!.frames.length
-                            ? frameIdx
-                            : 0]
-                        .metadata
-                        .windowWidth
-                    : null;
-                if (metaCenter != null &&
-                    metaWidth != null &&
-                    metaWidth > 1.0) {
-                  controller.setWindowLevel(metaCenter, metaWidth);
+                controller.resetZoomPan(notify: false);
+                final is8Bit = pixelFrame.bitsAllocated <= 8 ||
+                    pixelFrame.rawPixels is Uint8List;
+                if (is8Bit) {
+                  controller.setWindowLevel(128.0, 256.0);
                   controller.setFrame(pixelFrame,
                       updateWindowLevelFromFrame: false);
                 } else {
-                  controller.setFrame(pixelFrame,
-                      updateWindowLevelFromFrame: true);
+                  final metaCenter = _loadedSeries!.frames.isNotEmpty
+                      ? _loadedSeries!
+                          .frames[frameIdx < _loadedSeries!.frames.length
+                              ? frameIdx
+                              : 0]
+                          .metadata
+                          .windowCenter
+                      : null;
+                  final metaWidth = _loadedSeries!.frames.isNotEmpty
+                      ? _loadedSeries!
+                          .frames[frameIdx < _loadedSeries!.frames.length
+                              ? frameIdx
+                              : 0]
+                          .metadata
+                          .windowWidth
+                      : null;
+                  if (metaCenter != null &&
+                      metaWidth != null &&
+                      metaWidth > 1.0) {
+                    controller.setWindowLevel(metaCenter, metaWidth);
+                    controller.setFrame(pixelFrame,
+                        updateWindowLevelFromFrame: false);
+                  } else {
+                    controller.setFrame(pixelFrame,
+                        updateWindowLevelFromFrame: true);
+                  }
                 }
               }
             }
-
-            controller.updateMetadata(
-              patientName: _loadedSeries!.study?.patientName ?? 'Anonymous',
-              patientId: _loadedSeries!.study?.patientId ?? '-',
-              studyDescription:
-                  _loadedSeries!.study?.studyDescription ?? 'DICOM Study',
-              seriesDescription: _loadedSeries!.series.seriesDescription,
-              frameIndex: frameIdx + 1,
-              totalFrames: totalCount,
-              pixelSpacing: pixelFrame.pixelSpacing,
-            );
+          } else {
+            controller.clear();
           }
         } else {
           controller.clear();
         }
-      } else {
-        controller.clear();
       }
+    } finally {
+      _isSyncingFrames = false;
     }
   }
 
@@ -1809,37 +1948,42 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
       child: Column(
         children: [
           for (final ann in annotations) ...[
-            ListTile(
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-              selected: selected?.id == ann.id,
-              selectedTileColor: const Color(0xFF1F6FEB).withValues(alpha: 0.2),
-              leading: Icon(
-                _getAnnotationIcon(ann),
-                size: 16,
-                color: const Color(0xFFFFEB3B),
-              ),
-              title: Text(
-                _getAnnotationTitle(ann),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+            Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                selected: selected?.id == ann.id,
+                selectedTileColor:
+                    const Color(0xFF1F6FEB).withValues(alpha: 0.2),
+                leading: Icon(
+                  _getAnnotationIcon(ann),
+                  size: 16,
+                  color: const Color(0xFFFFEB3B),
                 ),
+                title: Text(
+                  _getAnnotationTitle(ann),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                subtitle: Text(
+                  'By ${ann.creatorName ?? "Anonymous"} • ${ann.type.name.toUpperCase()}',
+                  style:
+                      const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 14, color: Color(0xFF8B949E)),
+                  tooltip: 'Delete',
+                  onPressed: () =>
+                      _primaryAnnotationController.removeAnnotation(ann.id),
+                ),
+                onTap: () => _primaryAnnotationController.selectAnnotation(ann),
               ),
-              subtitle: Text(
-                'By ${ann.creatorName ?? "Anonymous"} • ${ann.type.name.toUpperCase()}',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
-              ),
-              trailing: IconButton(
-                icon:
-                    const Icon(Icons.close, size: 14, color: Color(0xFF8B949E)),
-                tooltip: 'Delete',
-                onPressed: () =>
-                    _primaryAnnotationController.removeAnnotation(ann.id),
-              ),
-              onTap: () => _primaryAnnotationController.selectAnnotation(ann),
             ),
             const Divider(height: 1, thickness: 1, color: Color(0xFF30363D)),
           ],

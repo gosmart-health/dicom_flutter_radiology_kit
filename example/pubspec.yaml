@@ -1,7 +1,7 @@
 name: dicom_flutter_radiology_kit_example
 description: "Interactive clinical test viewer and workbench for dicom_flutter_radiology_kit."
 publish_to: 'none'
-version: 0.0.2
+version: 0.0.3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
