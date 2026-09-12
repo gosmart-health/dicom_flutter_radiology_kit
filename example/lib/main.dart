@@ -1948,37 +1948,42 @@ class _DicomViewerWorkbenchState extends State<DicomViewerWorkbench>
       child: Column(
         children: [
           for (final ann in annotations) ...[
-            ListTile(
-              dense: true,
-              visualDensity: VisualDensity.compact,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-              selected: selected?.id == ann.id,
-              selectedTileColor: const Color(0xFF1F6FEB).withValues(alpha: 0.2),
-              leading: Icon(
-                _getAnnotationIcon(ann),
-                size: 16,
-                color: const Color(0xFFFFEB3B),
-              ),
-              title: Text(
-                _getAnnotationTitle(ann),
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+            Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                selected: selected?.id == ann.id,
+                selectedTileColor:
+                    const Color(0xFF1F6FEB).withValues(alpha: 0.2),
+                leading: Icon(
+                  _getAnnotationIcon(ann),
+                  size: 16,
+                  color: const Color(0xFFFFEB3B),
                 ),
+                title: Text(
+                  _getAnnotationTitle(ann),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                subtitle: Text(
+                  'By ${ann.creatorName ?? "Anonymous"} • ${ann.type.name.toUpperCase()}',
+                  style:
+                      const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 14, color: Color(0xFF8B949E)),
+                  tooltip: 'Delete',
+                  onPressed: () =>
+                      _primaryAnnotationController.removeAnnotation(ann.id),
+                ),
+                onTap: () => _primaryAnnotationController.selectAnnotation(ann),
               ),
-              subtitle: Text(
-                'By ${ann.creatorName ?? "Anonymous"} • ${ann.type.name.toUpperCase()}',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF8B949E)),
-              ),
-              trailing: IconButton(
-                icon:
-                    const Icon(Icons.close, size: 14, color: Color(0xFF8B949E)),
-                tooltip: 'Delete',
-                onPressed: () =>
-                    _primaryAnnotationController.removeAnnotation(ann.id),
-              ),
-              onTap: () => _primaryAnnotationController.selectAnnotation(ann),
             ),
             const Divider(height: 1, thickness: 1, color: Color(0xFF30363D)),
           ],
