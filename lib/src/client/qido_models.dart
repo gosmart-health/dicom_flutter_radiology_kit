@@ -1,3 +1,5 @@
+import '../imaging/pixel_spacing.dart';
+
 /// Data models and DICOM JSON parsing utilities for DICOMweb QIDO-RS and WADO-RS.
 
 /// Helper to parse DICOM JSON (Part 18 Standard Model) tag dictionaries.
@@ -122,6 +124,71 @@ class DicomJsonHelper {
 
     return '${dateStr}T$hh:$mm:$ss';
   }
+
+  /// Extracts [PixelSpacing] from DICOM JSON:
+  /// 1. (0028,0030) Pixel Spacing
+  /// 2. (0018,1164) Imager Pixel Spacing
+  /// 3. (5200,9229) Shared Functional Groups -> (0028,9110) Pixel Measures -> (0028,0030)
+  /// 4. (5200,9230) Per-Frame Functional Groups -> (0028,9110) Pixel Measures -> (0028,0030)
+  static PixelSpacing? getPixelSpacing(Map<String, dynamic>? json) {
+    if (json == null) return null;
+
+    PixelSpacing? extractFromTag(dynamic tagEntry) {
+      if (tagEntry == null) return null;
+      if (tagEntry is Map<String, dynamic>) {
+        final val = tagEntry['Value'];
+        final parsed = PixelSpacing.tryParse(val);
+        if (parsed != null) return parsed;
+      }
+      return PixelSpacing.tryParse(tagEntry);
+    }
+
+    // 1. Direct (0028,0030) Pixel Spacing
+    final ps = extractFromTag(json['00280030'] ?? json['0028,0030']);
+    if (ps != null) return ps;
+
+    // 2. Direct (0018,1164) Imager Pixel Spacing
+    final ips = extractFromTag(json['00181164'] ?? json['0018,1164']);
+    if (ips != null) return ips;
+
+    // 3. Shared Functional Groups Sequence (5200,9229) -> Pixel Measures Sequence (0028,9110)
+    final sharedSeq = json['52009229'] ?? json['5200,9229'];
+    if (sharedSeq is Map<String, dynamic>) {
+      final val = sharedSeq['Value'];
+      if (val is List && val.isNotEmpty && val.first is Map<String, dynamic>) {
+        final item = val.first as Map<String, dynamic>;
+        final pixelMeasures = item['00289110'] ?? item['0028,9110'];
+        if (pixelMeasures is Map<String, dynamic>) {
+          final pmVal = pixelMeasures['Value'];
+          if (pmVal is List && pmVal.isNotEmpty && pmVal.first is Map<String, dynamic>) {
+            final pmItem = pmVal.first as Map<String, dynamic>;
+            final pmPs = extractFromTag(pmItem['00280030'] ?? pmItem['0028,0030']);
+            if (pmPs != null) return pmPs;
+          }
+        }
+      }
+    }
+
+    // 4. Per-Frame Functional Groups Sequence (5200,9230) -> Pixel Measures Sequence (0028,9110)
+    final perFrameSeq = json['52009230'] ?? json['5200,9230'];
+    if (perFrameSeq is Map<String, dynamic>) {
+      final val = perFrameSeq['Value'];
+      if (val is List && val.isNotEmpty && val.first is Map<String, dynamic>) {
+        final item = val.first as Map<String, dynamic>;
+        final pixelMeasures = item['00289110'] ?? item['0028,9110'];
+        if (pixelMeasures is Map<String, dynamic>) {
+          final pmVal = pixelMeasures['Value'];
+          if (pmVal is List && pmVal.isNotEmpty && pmVal.first is Map<String, dynamic>) {
+            final pmItem = pmVal.first as Map<String, dynamic>;
+            final pmPs = extractFromTag(pmItem['00280030'] ?? pmItem['0028,0030']);
+            if (pmPs != null) return pmPs;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
 }
 
 /// DICOM Study summary returned from QIDO-RS `/studies`.
@@ -214,6 +281,11 @@ class DicomSeries {
   final String seriesDescription;
   final int numberOfInstances;
   final String performingPhysician;
+  final String? presentationCreationDate;
+  final String? presentationCreationTime;
+  final String? presentationCreationDateTimeIso;
+  final String? seriesDate;
+  final String? seriesTime;
   final Map<String, dynamic> rawJson;
 
   const DicomSeries({
@@ -224,8 +296,38 @@ class DicomSeries {
     required this.seriesDescription,
     required this.numberOfInstances,
     required this.performingPhysician,
+    this.presentationCreationDate,
+    this.presentationCreationTime,
+    this.presentationCreationDateTimeIso,
+    this.seriesDate,
+    this.seriesTime,
     required this.rawJson,
   });
+
+  bool get isImageSeries =>
+      modality.toUpperCase() != 'PR' &&
+      modality.toUpperCase() != 'KO' &&
+      modality.toUpperCase() != 'SR' &&
+      modality.toUpperCase() != 'AU' &&
+      modality.toUpperCase() != 'DOC';
+
+  /// Formatted ISO datetime string (YYYY-MM-DDTHH:mm:ss) derived from presentation creation or series date/time.
+  String? get dateTimeIso {
+    if (presentationCreationDateTimeIso != null) {
+      return presentationCreationDateTimeIso;
+    }
+    final effectiveDate = presentationCreationDate ?? seriesDate;
+    final effectiveTime = presentationCreationTime ?? seriesTime;
+    if (effectiveDate == null || effectiveDate.isEmpty) return null;
+    return DicomJsonHelper.formatIsoDateTime(effectiveDate, effectiveTime);
+  }
+
+  /// Comparable sort key string (YYYYMMDDHHMMSS) for chronological ordering.
+  String get dateTimeSortKey {
+    final date = presentationCreationDate ?? seriesDate ?? '';
+    final time = presentationCreationTime ?? seriesTime ?? '';
+    return '$date$time';
+  }
 
   factory DicomSeries.fromJson(Map<String, dynamic> json) {
     final seriesInstanceUID = DicomJsonHelper.getString(json, '0020000E') ?? '';
@@ -238,6 +340,25 @@ class DicomSeries {
     final rawPhysician = DicomJsonHelper.getString(json, '00081050');
     final performingPhysician = DicomJsonHelper.formatPersonName(rawPhysician);
 
+    final presentationCreationDate =
+        DicomJsonHelper.getString(json, '00700082') ??
+            DicomJsonHelper.getString(json, '0070,0082');
+    final presentationCreationTime =
+        DicomJsonHelper.getString(json, '00700083') ??
+            DicomJsonHelper.getString(json, '0070,0083');
+    final seriesDate = DicomJsonHelper.getString(json, '00080021') ??
+        DicomJsonHelper.getString(json, '0008,0021');
+    final seriesTime = DicomJsonHelper.getString(json, '00080031') ??
+        DicomJsonHelper.getString(json, '0008,0031');
+
+    final effectiveDate = presentationCreationDate ?? seriesDate;
+    final effectiveTime = presentationCreationTime ?? seriesTime;
+
+    final presentationCreationDateTimeIso =
+        (effectiveDate != null && effectiveDate.isNotEmpty)
+            ? DicomJsonHelper.formatIsoDateTime(effectiveDate, effectiveTime)
+            : null;
+
     return DicomSeries(
       seriesInstanceUID: seriesInstanceUID,
       studyInstanceUID: studyInstanceUID,
@@ -246,6 +367,11 @@ class DicomSeries {
       seriesDescription: seriesDescription,
       numberOfInstances: numberOfInstances,
       performingPhysician: performingPhysician,
+      presentationCreationDate: presentationCreationDate,
+      presentationCreationTime: presentationCreationTime,
+      presentationCreationDateTimeIso: presentationCreationDateTimeIso,
+      seriesDate: seriesDate,
+      seriesTime: seriesTime,
       rawJson: json,
     );
   }
@@ -268,7 +394,12 @@ class DicomInstanceSummary {
   final double? windowWidth;
   final String photometricInterpretation;
   final String? transferSyntaxUID;
+  final PixelSpacing? pixelSpacing;
   final Map<String, dynamic> rawJson;
+
+  bool get isImage =>
+      sopClassUID != '1.2.840.10008.5.1.4.1.1.11.1' &&
+      DicomJsonHelper.getString(rawJson, '00080060')?.toUpperCase() != 'PR';
 
   const DicomInstanceSummary({
     required this.sopInstanceUID,
@@ -286,8 +417,50 @@ class DicomInstanceSummary {
     this.windowWidth,
     required this.photometricInterpretation,
     this.transferSyntaxUID,
+    this.pixelSpacing,
     required this.rawJson,
   });
+
+  DicomInstanceSummary copyWith({
+    String? sopInstanceUID,
+    String? sopClassUID,
+    int? instanceNumber,
+    int? rows,
+    int? columns,
+    int? bitsAllocated,
+    int? bitsStored,
+    int? highBit,
+    bool? isSigned,
+    double? rescaleSlope,
+    double? rescaleIntercept,
+    double? windowCenter,
+    double? windowWidth,
+    String? photometricInterpretation,
+    String? transferSyntaxUID,
+    PixelSpacing? pixelSpacing,
+    Map<String, dynamic>? rawJson,
+  }) {
+    return DicomInstanceSummary(
+      sopInstanceUID: sopInstanceUID ?? this.sopInstanceUID,
+      sopClassUID: sopClassUID ?? this.sopClassUID,
+      instanceNumber: instanceNumber ?? this.instanceNumber,
+      rows: rows ?? this.rows,
+      columns: columns ?? this.columns,
+      bitsAllocated: bitsAllocated ?? this.bitsAllocated,
+      bitsStored: bitsStored ?? this.bitsStored,
+      highBit: highBit ?? this.highBit,
+      isSigned: isSigned ?? this.isSigned,
+      rescaleSlope: rescaleSlope ?? this.rescaleSlope,
+      rescaleIntercept: rescaleIntercept ?? this.rescaleIntercept,
+      windowCenter: windowCenter ?? this.windowCenter,
+      windowWidth: windowWidth ?? this.windowWidth,
+      photometricInterpretation:
+          photometricInterpretation ?? this.photometricInterpretation,
+      transferSyntaxUID: transferSyntaxUID ?? this.transferSyntaxUID,
+      pixelSpacing: pixelSpacing ?? this.pixelSpacing,
+      rawJson: rawJson ?? this.rawJson,
+    );
+  }
 
   factory DicomInstanceSummary.fromJson(Map<String, dynamic> json) {
     final sopInstanceUID = DicomJsonHelper.getString(json, '00080018') ?? '';
@@ -308,6 +481,7 @@ class DicomInstanceSummary {
     final photometricInterpretation =
         DicomJsonHelper.getString(json, '00280004') ?? 'MONOCHROME2';
     final transferSyntaxUID = DicomJsonHelper.getString(json, '00020010');
+    final pixelSpacing = DicomJsonHelper.getPixelSpacing(json);
 
     return DicomInstanceSummary(
       sopInstanceUID: sopInstanceUID,
@@ -325,6 +499,7 @@ class DicomInstanceSummary {
       windowWidth: windowWidth,
       photometricInterpretation: photometricInterpretation,
       transferSyntaxUID: transferSyntaxUID,
+      pixelSpacing: pixelSpacing,
       rawJson: json,
     );
   }

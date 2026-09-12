@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../annotations/gsps_codec.dart';
 import '../imaging/pixel_frame.dart';
+import '../imaging/pixel_spacing.dart';
 import '../imaging/presentation_state.dart';
 import '../imaging/window_presets.dart';
 
@@ -12,6 +14,7 @@ class ViewportController extends ChangeNotifier {
   double _zoom = 1.0;
   Offset _panOffset = Offset.zero;
   WindowPreset? _activePreset = WindowPresets.softTissue;
+  PixelSpacing? _pixelSpacing;
   String _patientName = '';
   String _patientId = '';
   String _studyDescription = '';
@@ -26,6 +29,13 @@ class ViewportController extends ChangeNotifier {
   double get zoom => _zoom;
   Offset get panOffset => _panOffset;
   WindowPreset? get activePreset => _activePreset;
+  PixelSpacing? get pixelSpacing => _pixelSpacing ?? _currentFrame?.pixelSpacing;
+
+  /// Sets or overrides the active pixel spacing (DICOM 0028,0030).
+  void setPixelSpacing(PixelSpacing? spacing) {
+    _pixelSpacing = spacing;
+    notifyListeners();
+  }
 
   String get patientName => _patientName;
   String get patientId => _patientId;
@@ -70,6 +80,30 @@ class ViewportController extends ChangeNotifier {
       _activePreset = null;
     }
     if (notify) {
+      notifyListeners();
+      _dispatchPresentationChanged();
+    }
+  }
+
+  /// Restores viewport VOI LUT (window center & width), zoom, and pan offset parameters from a [GspsPresentationState].
+  void applyGspsPresentationState(GspsPresentationState gsps,
+      {bool notify = true}) {
+    bool changed = false;
+    if (gsps.windowCenter != null && gsps.windowWidth != null) {
+      _windowCenter = gsps.windowCenter!;
+      _windowWidth = gsps.windowWidth! < 1.0 ? 1.0 : gsps.windowWidth!;
+      _activePreset = null;
+      changed = true;
+    }
+    if (gsps.zoom != null) {
+      _zoom = gsps.zoom!.clamp(0.1, 20.0);
+      changed = true;
+    }
+    if (gsps.panOffset != null) {
+      _panOffset = gsps.panOffset!;
+      changed = true;
+    }
+    if (changed && notify) {
       notifyListeners();
       _dispatchPresentationChanged();
     }
@@ -124,6 +158,7 @@ class ViewportController extends ChangeNotifier {
   /// Clears active pixel frame and patient metadata from memory.
   void clear() {
     _currentFrame = null;
+    _pixelSpacing = null;
     _patientName = '';
     _patientId = '';
     _studyDescription = '';
@@ -196,6 +231,7 @@ class ViewportController extends ChangeNotifier {
     String? seriesDescription,
     int? frameIndex,
     int? totalFrames,
+    PixelSpacing? pixelSpacing,
   }) {
     if (patientName != null) _patientName = patientName;
     if (patientId != null) _patientId = patientId;
@@ -203,12 +239,20 @@ class ViewportController extends ChangeNotifier {
     if (seriesDescription != null) _seriesDescription = seriesDescription;
     if (frameIndex != null) _frameIndex = frameIndex;
     if (totalFrames != null) _totalFrames = totalFrames;
+    if (pixelSpacing != null) _pixelSpacing = pixelSpacing;
     notifyListeners();
   }
 
   /// Whether zoom or pan has been customized away from default auto-fit / zero-pan.
   bool get isZoomPanModified =>
       (_zoom - 1.0).abs() > 0.001 || _panOffset != Offset.zero;
+
+  /// Whether window center or width has been customized away from standard defaults.
+  bool get isWindowLevelModified =>
+      (_windowCenter - 40.0).abs() > 0.001 || (_windowWidth - 400.0).abs() > 0.001;
+
+  /// Whether any presentation state parameters (W/L, Zoom, Pan) have been modified.
+  bool get isPresentationModified => isZoomPanModified || isWindowLevelModified;
 
   /// Resets zoom to 1.0 (auto-fit) and panOffset to Offset.zero.
   void resetZoomPan({bool notify = true}) {

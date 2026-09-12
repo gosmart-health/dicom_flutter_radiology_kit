@@ -1,0 +1,59 @@
+name: Publish to pub.dev
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish Package
+    permissions:
+      id-token: write # Mandatory for pub.dev OIDC automated authentication
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Start DICOM Mock Server
+        run: |
+          docker run -d --name dicom-mock-server --platform linux/arm64 -p 8000:8000 -p 11112:11112 imanabu/dicom-py-mock-server:latest
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Analyze Package
+        run: flutter analyze
+
+      - name: Verify Mock Server
+        run: |
+          echo "Waiting for DICOM mock server..."
+          for i in $(seq 1 30); do
+            if (echo > /dev/tcp/localhost/8000) 2>/dev/null && (echo > /dev/tcp/localhost/11112) 2>/dev/null; then
+              echo "DICOM mock server is ready on ports 8000 and 11112!"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Notice: Mock server not detected on ports 8000 & 11112 after 30s"
+
+      - name: Run Tests
+        run: flutter test
+
+      - name: Validate Publish Dry-Run
+        run: flutter pub publish --dry-run
+
+      - name: Publish to pub.dev
+        uses: dart-lang/setup-dart/publish@v1
+

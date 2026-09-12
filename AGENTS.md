@@ -1,7 +1,7 @@
 # AGENTS.md — DicomFlutterRadiologyKit Project Guidelines
 
 ## Project Architecture & Tech Stack
-- **Target:** Flutter Web & Desktop (Dart 3+ WasmGC, Skwasm/CanvasKit).
+- **Target:** Flutter Web (Dart 3+ WasmGC, Skwasm/CanvasKit).
 - **Core Package Scope:** Drop-in medical imaging kit (`dicom_flutter_radiology_kit`) focusing on clinical/embedded review, WADO-RS streaming, and zero-jank 16-bit rendering.
 - Tooling: Always use `fvm`with the Dart and Flutter tooling and use the latest stable release
 - **Key Constraints:**

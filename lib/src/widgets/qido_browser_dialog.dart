@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../annotations/gsps_codec.dart';
 import '../client/dicom_web_client.dart';
 import '../client/qido_models.dart';
 import '../client/series_buffer.dart';
@@ -12,17 +13,25 @@ class QidoBrowserDialog extends StatefulWidget {
   final String? initialServerUrl;
   final http.Client? httpClient;
   final DicomCompressionMode defaultCompressionMode;
+  final DicomSeriesBuffer? currentLoadedSeries;
   final void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)?
       onSeriesLoaded;
   final void Function(DicomStudy study)? onStudySelected;
+  final void Function(
+    List<GspsPresentationState> states, {
+    DicomSeriesBuffer? loadedBuffer,
+    PixelFrame? initialFrame,
+  })? onPresentationStateLoaded;
 
   const QidoBrowserDialog({
     super.key,
     this.initialServerUrl,
     this.httpClient,
     this.defaultCompressionMode = DicomCompressionMode.raw,
+    this.currentLoadedSeries,
     this.onSeriesLoaded,
     this.onStudySelected,
+    this.onPresentationStateLoaded,
   });
 
   /// Session-persisted compression mode across dialog invocations.
@@ -40,9 +49,15 @@ class QidoBrowserDialog extends StatefulWidget {
     String? initialServerUrl,
     http.Client? httpClient,
     DicomCompressionMode defaultCompressionMode = DicomCompressionMode.raw,
+    DicomSeriesBuffer? currentLoadedSeries,
     void Function(DicomSeriesBuffer seriesBuffer, PixelFrame initialFrame)?
         onSeriesLoaded,
     void Function(DicomStudy study)? onStudySelected,
+    void Function(
+      List<GspsPresentationState> states, {
+      DicomSeriesBuffer? loadedBuffer,
+      PixelFrame? initialFrame,
+    })? onPresentationStateLoaded,
   }) {
     return showDialog<DicomSeriesBuffer>(
       context: context,
@@ -51,8 +66,10 @@ class QidoBrowserDialog extends StatefulWidget {
         initialServerUrl: initialServerUrl,
         httpClient: httpClient,
         defaultCompressionMode: defaultCompressionMode,
+        currentLoadedSeries: currentLoadedSeries,
         onSeriesLoaded: onSeriesLoaded,
         onStudySelected: onStudySelected,
+        onPresentationStateLoaded: onPresentationStateLoaded,
       ),
     );
   }
@@ -240,6 +257,103 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
       setState(() {
         _isDownloading = false;
         _errorMessage = 'Download error: $e';
+      });
+    }
+  }
+
+  Future<void> _loadPresentationState(DicomSeries prSeries) async {
+    setState(() {
+      _selectedSeries = prSeries;
+      _isDownloading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final studyUid =
+          _selectedStudy?.studyInstanceUID ?? prSeries.studyInstanceUID;
+      final states = await _client!.fetchSeriesPresentationStates(
+        studyInstanceUID: studyUid,
+        seriesInstanceUID: prSeries.seriesInstanceUID,
+      );
+
+      // Find referenced image series UID if available in GSPS
+      String? targetSeriesUid;
+      for (final gsps in states) {
+        if (gsps.referencedSeriesUid != null &&
+            gsps.referencedSeriesUid!.isNotEmpty) {
+          targetSeriesUid = gsps.referencedSeriesUid;
+          break;
+        }
+      }
+
+      final currentLoaded = widget.currentLoadedSeries;
+      final isMatchingStudy = currentLoaded != null &&
+          (currentLoaded.study?.studyInstanceUID == studyUid ||
+              currentLoaded.series.studyInstanceUID == studyUid);
+
+      final isAlreadyViewingReferencedSeries = isMatchingStudy &&
+          (targetSeriesUid == null ||
+              currentLoaded.series.seriesInstanceUID == targetSeriesUid);
+
+      if (isAlreadyViewingReferencedSeries) {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        widget.onPresentationStateLoaded?.call(states);
+      } else {
+        DicomSeries? targetImageSeries;
+        if (targetSeriesUid != null) {
+          targetImageSeries = _seriesList
+              .where((s) =>
+                  s.seriesInstanceUID == targetSeriesUid && s.isImageSeries)
+              .firstOrNull;
+        }
+        targetImageSeries ??=
+            _seriesList.where((s) => s.isImageSeries).firstOrNull;
+
+        if (targetImageSeries != null) {
+          _downloadProgressNotifier.value =
+              (loaded: 0, total: targetImageSeries.numberOfInstances);
+
+          final seriesBuffer = await _client!.downloadSeriesBuffers(
+            study: _selectedStudy,
+            series: targetImageSeries,
+            compressionMode: _selectedCompressionMode,
+            onProgress: (loaded, total) {
+              _downloadProgressNotifier.value = (loaded: loaded, total: total);
+            },
+          );
+
+          PixelFrame? initialFrame;
+          if (seriesBuffer.frameCount > 0) {
+            initialFrame = await seriesBuffer.getPixelFrame(0);
+          }
+
+          if (mounted) {
+            Navigator.of(context).pop(seriesBuffer);
+          }
+
+          if (widget.onPresentationStateLoaded != null) {
+            widget.onPresentationStateLoaded!(
+              states,
+              loadedBuffer: seriesBuffer,
+              initialFrame: initialFrame,
+            );
+          } else if (widget.onSeriesLoaded != null && initialFrame != null) {
+            widget.onSeriesLoaded!(seriesBuffer, initialFrame);
+          }
+        } else {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+          widget.onPresentationStateLoaded?.call(states);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isDownloading = false;
+        _errorMessage = 'Failed to load presentation state: $e';
       });
     }
   }
@@ -789,42 +903,118 @@ class _QidoBrowserDialogState extends State<QidoBrowserDialog> {
                                   ],
                                 ),
                                 const SizedBox(height: 6),
-                                Text(
-                                  '${series.numberOfInstances} instance(s) • Dr. ${series.performingPhysician}',
-                                  style: const TextStyle(
-                                      fontSize: 11, color: Color(0xFF8B949E)),
+                                Builder(
+                                  builder: (context) {
+                                    final isPr = series.modality.toUpperCase() == 'PR';
+                                    final dateStr = series.dateTimeIso;
+                                    final dateSuffix = (dateStr != null &&
+                                            dateStr.isNotEmpty &&
+                                            dateStr != '-')
+                                        ? ' • $dateStr'
+                                        : '';
+                                    final countOrType = series.numberOfInstances > 0
+                                        ? (isPr
+                                            ? '${series.numberOfInstances} instance(s) (PR)'
+                                            : '${series.numberOfInstances} instance(s)')
+                                        : (isPr
+                                            ? 'Presentation State (PR)'
+                                            : '${series.numberOfInstances} instance(s)');
+                                    return Text(
+                                      '$countOrType$dateSuffix • Dr. ${series.performingPhysician}',
+                                      style: const TextStyle(
+                                          fontSize: 11, color: Color(0xFF8B949E)),
+                                    );
+                                  },
                                 ),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _isDownloading
-                                        ? null
-                                        : () => _loadSeriesIntoBuffer(series),
-                                    icon: isDownloadingThis
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white),
-                                          )
-                                        : const Icon(
-                                            Icons.download_for_offline_outlined,
-                                            size: 16),
-                                    label: Text(
-                                      isDownloadingThis
-                                          ? 'Buffering...'
-                                          : 'Download & View Series',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF1F6FEB),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8),
-                                    ),
-                                  ),
+                                  child: series.isImageSeries
+                                      ? ElevatedButton.icon(
+                                          onPressed: _isDownloading
+                                              ? null
+                                              : () => _loadSeriesIntoBuffer(series),
+                                          icon: isDownloadingThis
+                                              ? const SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white),
+                                                )
+                                              : const Icon(
+                                                  Icons.download_for_offline_outlined,
+                                                  size: 16),
+                                          label: Text(
+                                            isDownloadingThis
+                                                ? 'Buffering...'
+                                                : 'Download & View Series',
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF1F6FEB),
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                          ),
+                                        )
+                                      : series.modality.toUpperCase() == 'PR'
+                                          ? ElevatedButton.icon(
+                                              onPressed: _isDownloading
+                                                  ? null
+                                                  : () => _loadPresentationState(series),
+                                              icon: isDownloadingThis
+                                                  ? const SizedBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white),
+                                                    )
+                                                  : const Icon(
+                                                      Icons.draw_outlined,
+                                                      size: 16),
+                                              label: Text(
+                                                isDownloadingThis
+                                                    ? 'Loading PS...'
+                                                    : 'Load & Apply Annotations',
+                                                style: const TextStyle(fontSize: 12),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF8957E5),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(
+                                                    vertical: 8),
+                                              ),
+                                            )
+                                          : Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  vertical: 8, horizontal: 12),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF161B22),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                    color: const Color(0xFF30363D)),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.description_outlined,
+                                                    size: 14,
+                                                    color: Color(0xFF8B949E),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Non-Image Series (${series.modality})',
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        color: Color(0xFF8B949E)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                 ),
                               ],
                             ),

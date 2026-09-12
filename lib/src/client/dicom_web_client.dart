@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../codecs/codec_router.dart';
 import '../imaging/pixel_frame.dart';
+import '../annotations/gsps_codec.dart';
 import 'qido_models.dart';
 import 'series_buffer.dart';
 
@@ -108,9 +109,34 @@ class DicomWebClient {
     }
 
     final List<dynamic> jsonList = json.decode(response.body);
-    return jsonList
+    final seriesList = jsonList
         .map((item) => DicomSeries.fromJson(item as Map<String, dynamic>))
         .toList();
+
+    seriesList.sort((a, b) {
+      final aIsPr = a.modality.toUpperCase() == 'PR';
+      final bIsPr = b.modality.toUpperCase() == 'PR';
+
+      if (aIsPr && bIsPr) {
+        final keyA = a.dateTimeSortKey;
+        final keyB = b.dateTimeSortKey;
+        if (keyA.isNotEmpty && keyB.isNotEmpty && keyA != keyB) {
+          return keyB.compareTo(keyA); // latest to oldest
+        }
+        return a.seriesNumber.compareTo(b.seriesNumber);
+      }
+      if (aIsPr != bIsPr) {
+        return aIsPr ? 1 : -1;
+      }
+      final keyA = a.dateTimeSortKey;
+      final keyB = b.dateTimeSortKey;
+      if (keyA.isNotEmpty && keyB.isNotEmpty && keyA != keyB) {
+        return keyB.compareTo(keyA);
+      }
+      return a.seriesNumber.compareTo(b.seriesNumber);
+    });
+
+    return seriesList;
   }
 
   /// Queries instance summaries for a series via QIDO-RS `/studies/{studyUID}/series/{seriesUID}/instances`.
@@ -215,6 +241,15 @@ class DicomWebClient {
     DicomSeriesBuffer? targetBuffer,
     bool predecodeFirstFrame = false,
   }) async* {
+    if (!series.isImageSeries || series.modality.toUpperCase() == 'PR') {
+      print(
+          '[DICOM-CLIENT] Skipping frame streaming for non-image modality (${series.modality}) series ${series.seriesInstanceUID}.');
+      if (targetBuffer != null) {
+        targetBuffer.isComplete = true;
+      }
+      return;
+    }
+
     final instances = await fetchInstanceMetadata(
       studyInstanceUID: series.studyInstanceUID,
       seriesInstanceUID: series.seriesInstanceUID,
@@ -231,6 +266,11 @@ class DicomWebClient {
         break;
       }
       final inst = instances[i];
+      if (!inst.isImage) {
+        print(
+            '[DICOM-CLIENT] Skipping frame request for non-image instance ${inst.sopInstanceUID} (SOP Class: ${inst.sopClassUID}).');
+        continue;
+      }
       final rawBytes = await fetchFrameBytes(
         studyInstanceUID: series.studyInstanceUID,
         seriesInstanceUID: series.seriesInstanceUID,
@@ -239,23 +279,8 @@ class DicomWebClient {
         compressionMode: compressionMode,
       );
 
-      final updatedMetadata = DicomInstanceSummary(
-        sopInstanceUID: inst.sopInstanceUID,
-        sopClassUID: inst.sopClassUID,
-        instanceNumber: inst.instanceNumber,
-        rows: inst.rows,
-        columns: inst.columns,
-        bitsAllocated: inst.bitsAllocated,
-        bitsStored: inst.bitsStored,
-        highBit: inst.highBit,
-        isSigned: inst.isSigned,
-        rescaleSlope: inst.rescaleSlope,
-        rescaleIntercept: inst.rescaleIntercept,
-        windowCenter: inst.windowCenter,
-        windowWidth: inst.windowWidth,
-        photometricInterpretation: inst.photometricInterpretation,
+      final updatedMetadata = inst.copyWith(
         transferSyntaxUID: effectiveTransferSyntax,
-        rawJson: inst.rawJson,
       );
 
       final frameBuffer = DicomFrameBuffer(
@@ -419,6 +444,120 @@ class DicomWebClient {
       if (match) return i;
     }
     return -1;
+  }
+
+  /// Stores a DICOM Presentation State instance to the server via STOW-RS.
+  ///
+  /// Sends a multipart/related POST request with `application/dicom` Part 10 bytes
+  /// to `$baseUrl/studies/$studyInstanceUID` (or `$baseUrl/studies`).
+  ///
+  /// Returns the stored SOP Instance UID on success.
+  Future<String> storePresentationState({
+    required String studyInstanceUID,
+    required Uint8List dicomPart10Bytes,
+    String? sopInstanceUID,
+  }) async {
+    final boundary = '----DicomBoundary${DateTime.now().microsecondsSinceEpoch}';
+    final builder = BytesBuilder(copy: false);
+    builder.add(ascii.encode('--$boundary\r\n'));
+    builder.add(ascii.encode('Content-Type: application/dicom\r\n\r\n'));
+    builder.add(dicomPart10Bytes);
+    builder.add(ascii.encode('\r\n--$boundary--\r\n'));
+    final bodyBytes = builder.toBytes();
+
+    final uri = Uri.parse('$baseUrl/studies/$studyInstanceUID');
+    final requestHeaders = {
+      'Content-Type': 'multipart/related; type="application/dicom"; boundary=$boundary',
+      'Accept': 'application/dicom+json, application/json',
+      ...?headers,
+    };
+
+    final response = await _httpClient.post(uri, headers: requestHeaders, body: bodyBytes);
+    if (response.statusCode != 200 && response.statusCode != 202) {
+      throw Exception(
+        'STOW-RS store failed (HTTP ${response.statusCode}): ${response.body}',
+      );
+    }
+
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final refSeq = decoded['00081199'] ?? decoded['ReferencedSOPSequence'];
+        if (refSeq is Map && refSeq['Value'] is List) {
+          final firstItem = (refSeq['Value'] as List).firstOrNull;
+          if (firstItem is Map) {
+            final uid = (firstItem['00081155']?['Value'] as List?)?.firstOrNull?.toString() ??
+                firstItem['ReferencedSOPInstanceUID']?.toString();
+            if (uid != null && uid.isNotEmpty) return uid;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return sopInstanceUID ?? 'stored_gsps';
+  }
+
+  /// Retrieves GSPS presentation states for a specific series via WADO-RS series metadata.
+  Future<List<GspsPresentationState>> fetchSeriesPresentationStates({
+    required String studyInstanceUID,
+    required String seriesInstanceUID,
+  }) async {
+    final results = <GspsPresentationState>[];
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/studies/$studyInstanceUID/series/$seriesInstanceUID/metadata',
+      );
+      final requestHeaders = {
+        'Accept': 'application/dicom+json, application/json',
+        ...?headers,
+      };
+
+      final resp = await _httpClient.get(uri, headers: requestHeaders);
+      if (resp.statusCode == 200) {
+        final dynamic bodyJson = json.decode(resp.body);
+        final List<dynamic> items = bodyJson is List
+            ? bodyJson
+            : (bodyJson is Map<String, dynamic> ? [bodyJson] : []);
+        for (final item in items) {
+          if (item is Map<String, dynamic>) {
+            try {
+              final gsps = GspsPresentationState.fromDicomJson(item);
+              results.add(gsps);
+            } catch (e) {
+              print('[DICOM-CLIENT] Failed to parse GSPS item: $e');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('[DICOM-CLIENT] Error querying GSPS series presentation states: $e');
+    }
+    return results;
+  }
+
+  /// Queries and retrieves all GSPS presentation states for a study via QIDO-RS and WADO-RS.
+  Future<List<GspsPresentationState>> fetchPresentationStates({
+    required String studyInstanceUID,
+  }) async {
+    final results = <GspsPresentationState>[];
+
+    try {
+      // 1. Query all series for the study to find PR (Presentation State) series
+      final seriesList = await querySeries(studyInstanceUID: studyInstanceUID);
+      final prSeriesList = seriesList.where((s) => s.modality.toUpperCase() == 'PR').toList();
+
+      for (final s in prSeriesList) {
+        final seriesStates = await fetchSeriesPresentationStates(
+          studyInstanceUID: studyInstanceUID,
+          seriesInstanceUID: s.seriesInstanceUID,
+        );
+        results.addAll(seriesStates);
+      }
+    } catch (e) {
+      print('[DICOM-CLIENT] Error querying GSPS presentation states: $e');
+    }
+
+    return results;
   }
 
   void dispose() {

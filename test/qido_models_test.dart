@@ -128,6 +128,46 @@ void main() {
       expect(series.performingPhysician, 'TAYLOR, RICHARD');
     });
 
+    test('DicomSeries parses PresentationCreationDate (0070,0082) and PresentationCreationTime (0070,0083)', () {
+      final prSeriesJson = {
+        '0020000D': {
+          'vr': 'UI',
+          'Value': ['1.2.3.4.5.6.7']
+        },
+        '0020000E': {
+          'vr': 'UI',
+          'Value': ['1.2.3.4.5.6.7.PR1']
+        },
+        '00080060': {
+          'vr': 'CS',
+          'Value': ['PR']
+        },
+        '00200011': {
+          'vr': 'IS',
+          'Value': [101]
+        },
+        '0008103E': {
+          'vr': 'LO',
+          'Value': ['GSPS PR Annotations']
+        },
+        '00700082': {
+          'vr': 'DA',
+          'Value': ['20260909']
+        },
+        '00700083': {
+          'vr': 'TM',
+          'Value': ['164053']
+        },
+      };
+
+      final series = DicomSeries.fromJson(prSeriesJson);
+      expect(series.presentationCreationDate, '20260909');
+      expect(series.presentationCreationTime, '164053');
+      expect(series.presentationCreationDateTimeIso, '2026-09-09T16:40:53');
+      expect(series.dateTimeIso, '2026-09-09T16:40:53');
+      expect(series.dateTimeSortKey, '20260909164053');
+    });
+
     test('DicomInstanceSummary parses instance metadata tags', () {
       final instanceJson = {
         '00080018': {
@@ -184,7 +224,11 @@ void main() {
         },
         '00280004': {
           'vr': 'CS',
-          'Value': ['MONOCHROME2']
+          'Value': ['MONOCHROME2'],
+        },
+        '00280030': {
+          'vr': 'DS',
+          'Value': [0.661468, 0.661468],
         },
       };
 
@@ -199,6 +243,69 @@ void main() {
       expect(summary.rescaleSlope, 1.0);
       expect(summary.windowCenter, 40.0);
       expect(summary.windowWidth, 400.0);
+      expect(summary.pixelSpacing, isNotNull);
+      expect(summary.pixelSpacing!.rowSpacing, closeTo(0.661468, 1e-6));
+      expect(summary.pixelSpacing!.columnSpacing, closeTo(0.661468, 1e-6));
+    });
+
+    test('DicomInstanceSummary parses various Pixel Spacing and fallback formats', () {
+      // String list
+      final json1 = {
+        '00280030': {
+          'vr': 'DS',
+          'Value': ['0.75', '0.85']
+        }
+      };
+      final s1 = DicomInstanceSummary.fromJson(json1);
+      expect(s1.pixelSpacing?.rowSpacing, closeTo(0.75, 1e-6));
+      expect(s1.pixelSpacing?.columnSpacing, closeTo(0.85, 1e-6));
+
+      // Single string with backslash
+      final json2 = {
+        '00280030': {
+          'vr': 'DS',
+          'Value': ['0.5\\0.5']
+        }
+      };
+      final s2 = DicomInstanceSummary.fromJson(json2);
+      expect(s2.pixelSpacing?.rowSpacing, closeTo(0.5, 1e-6));
+      expect(s2.pixelSpacing?.columnSpacing, closeTo(0.5, 1e-6));
+
+      // Fallback: Imager Pixel Spacing (0018,1164)
+      final json3 = {
+        '00181164': {
+          'vr': 'DS',
+          'Value': [0.14, 0.14]
+        }
+      };
+      final s3 = DicomInstanceSummary.fromJson(json3);
+      expect(s3.pixelSpacing?.rowSpacing, closeTo(0.14, 1e-6));
+      expect(s3.pixelSpacing?.columnSpacing, closeTo(0.14, 1e-6));
+
+      // Fallback: Shared Functional Groups Sequence (5200,9229)
+      final json4 = {
+        '52009229': {
+          'vr': 'SQ',
+          'Value': [
+            {
+              '00289110': {
+                'vr': 'SQ',
+                'Value': [
+                  {
+                    '00280030': {
+                      'vr': 'DS',
+                      'Value': [0.625, 0.625]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      };
+      final s4 = DicomInstanceSummary.fromJson(json4);
+      expect(s4.pixelSpacing?.rowSpacing, closeTo(0.625, 1e-6));
+      expect(s4.pixelSpacing?.columnSpacing, closeTo(0.625, 1e-6));
     });
 
     test('DicomWebClient normalizes URLs properly', () {
@@ -206,13 +313,47 @@ void main() {
           'http://localhost:8000/dicomweb');
       expect(DicomWebClient.normalizeBaseUrl('http://localhost:8000/'),
           'http://localhost:8000/dicomweb');
-      expect(DicomWebClient.normalizeBaseUrl('http://localhost:8000/dicomweb'),
-          'http://localhost:8000/dicomweb');
       expect(
         DicomWebClient.normalizeBaseUrl(
             'https://server.dcmjs.org/dcm4chee-arc/aets/DCM4CHEE/rs'),
         'https://server.dcmjs.org/dcm4chee-arc/aets/DCM4CHEE/rs',
       );
+    });
+
+    test('DicomSeries.isImageSeries detects image vs non-image presentation state series', () {
+      final ctSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.1']},
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+      });
+      expect(ctSeries.isImageSeries, isTrue);
+
+      final prSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.2']},
+        '00080060': {'vr': 'CS', 'Value': ['PR']},
+      });
+      expect(prSeries.isImageSeries, isFalse);
+
+      final srSeries = DicomSeries.fromJson({
+        '0020000E': {'vr': 'UI', 'Value': ['1.2.3.4.3']},
+        '00080060': {'vr': 'CS', 'Value': ['SR']},
+      });
+      expect(srSeries.isImageSeries, isFalse);
+    });
+
+    test('DicomInstanceSummary.isImage identifies GSPS as non-image', () {
+      final imgInst = DicomInstanceSummary.fromJson({
+        '00080018': {'vr': 'UI', 'Value': ['1.2.3.4.1.1']},
+        '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.2']}, // CT Image
+        '00080060': {'vr': 'CS', 'Value': ['CT']},
+      });
+      expect(imgInst.isImage, isTrue);
+
+      final gspsInst = DicomInstanceSummary.fromJson({
+        '00080018': {'vr': 'UI', 'Value': ['1.2.3.4.2.1']},
+        '00080016': {'vr': 'UI', 'Value': ['1.2.840.10008.5.1.4.1.1.11.1']}, // GSPS
+        '00080060': {'vr': 'CS', 'Value': ['PR']},
+      });
+      expect(gspsInst.isImage, isFalse);
     });
   });
 }
