@@ -13,6 +13,13 @@ jobs:
       id-token: write # Mandatory for pub.dev OIDC automated authentication
     runs-on: ubuntu-latest
 
+    services:
+      dicom-mock-server:
+        image: imanabu/dicom-py-mock-server:latest
+        ports:
+          - 8000:8000
+          - 11112:11112
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -28,6 +35,18 @@ jobs:
 
       - name: Analyze Package
         run: flutter analyze
+
+      - name: Verify Mock Server
+        run: |
+          echo "Waiting for DICOM mock server..."
+          for i in $(seq 1 30); do
+            if (echo > /dev/tcp/localhost/8000) 2>/dev/null && (echo > /dev/tcp/localhost/11112) 2>/dev/null; then
+              echo "DICOM mock server is ready on ports 8000 and 11112!"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Notice: Mock server not detected on ports 8000 & 11112 after 30s"
 
       - name: Run Tests
         run: flutter test
