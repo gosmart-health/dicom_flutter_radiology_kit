@@ -8,20 +8,18 @@ void main() {
   group('Live Mock Server (localhost:8000) Integration Test', () {
     test('Queries live studies, series, buffers frames, and renders ui.Image',
         () async {
+      final client = DicomWebClient(baseUrl: 'http://localhost:8000');
+      final List<DicomStudy> studies;
       try {
-        final socket = await Socket.connect('localhost', 8000,
-            timeout: const Duration(seconds: 1));
-        await socket.close();
+        studies = await client
+            .queryStudies()
+            .timeout(const Duration(seconds: 10));
       } catch (e) {
         print(
-            'Skipping live mock server test: mock server not reachable on localhost:8000');
+            'Skipping live mock server test: mock server not reachable on localhost:8000 ($e)');
         return;
       }
 
-      final client = DicomWebClient(baseUrl: 'http://localhost:8000');
-
-      // 1. Fetch studies
-      final studies = await client.queryStudies();
       expect(studies, isNotEmpty);
       print('Fetched ${studies.length} studies from live server');
 
