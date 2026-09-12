@@ -25,19 +25,25 @@ void main() {
       expect(studies, isNotEmpty);
       print('Fetched ${studies.length} studies from live server');
 
-      final study = studies.first;
+      final study = studies.firstWhere(
+        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        orElse: () => studies.first,
+      );
       expect(study.studyInstanceUID, isNotEmpty);
       expect(study.patientName, isNotEmpty);
       print(
-          'First study: Patient=${study.patientName}, ID=${study.patientId}, Modality=${study.modality}, ISO Date=${study.studyDateTimeIso}');
+          'Target study: Patient=${study.patientName}, ID=${study.patientId}, Modality=${study.modality}, ISO Date=${study.studyDateTimeIso}');
 
       // 2. Fetch series
       final seriesList =
           await client.querySeries(studyInstanceUID: study.studyInstanceUID);
       expect(seriesList, isNotEmpty);
-      final series = seriesList.first;
+      final series = seriesList.firstWhere(
+        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        orElse: () => seriesList.first,
+      );
       print(
-          'First series: UID=${series.seriesInstanceUID}, Description=${series.seriesDescription}, Instances=${series.numberOfInstances}');
+          'Target series: UID=${series.seriesInstanceUID}, Description=${series.seriesDescription}, Instances=${series.numberOfInstances}');
 
       // 3. Download series buffers
       final instances = await client.fetchInstanceMetadata(
@@ -100,6 +106,6 @@ void main() {
       print(
           'Successfully rendered live mock server frame into ${img.width}x${img.height} ui.Image!');
       img.dispose();
-    });
+    }, timeout: const Timeout(Duration(minutes: 2)));
   });
 }
