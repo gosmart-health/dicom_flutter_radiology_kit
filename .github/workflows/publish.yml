@@ -54,6 +54,10 @@ jobs:
       - name: Validate Publish Dry-Run
         run: flutter pub publish --dry-run
 
+      - name: Set up Dart for pub.dev OIDC
+        uses: dart-lang/setup-dart@v1
+
       - name: Publish to pub.dev
-        uses: dart-lang/setup-dart/publish@v1
+        run: flutter pub publish --force
+
 
