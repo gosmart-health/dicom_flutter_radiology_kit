@@ -26,7 +26,7 @@ void main() {
       print('Fetched ${studies.length} studies from live server');
 
       final study = studies.firstWhere(
-        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        (s) => s.numberOfInstances <= 30,
         orElse: () => studies.first,
       );
       expect(study.studyInstanceUID, isNotEmpty);
@@ -39,7 +39,7 @@ void main() {
           await client.querySeries(studyInstanceUID: study.studyInstanceUID);
       expect(seriesList, isNotEmpty);
       final series = seriesList.firstWhere(
-        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        (s) => s.numberOfInstances <= 30,
         orElse: () => seriesList.first,
       );
       print(

@@ -20,7 +20,7 @@ void main() {
       final studies = await client.queryStudies();
       expect(studies, isNotEmpty);
       final study = studies.firstWhere(
-        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        (s) => s.numberOfInstances <= 30,
         orElse: () => studies.first,
       );
       print('Target study: ${study.patientName} (${study.studyInstanceUID})');
@@ -29,7 +29,7 @@ void main() {
       final seriesList = await client.querySeries(studyInstanceUID: study.studyInstanceUID);
       expect(seriesList, isNotEmpty);
       final series = seriesList.firstWhere(
-        (s) => s.numberOfInstances != null && s.numberOfInstances! <= 30,
+        (s) => s.numberOfInstances <= 30,
         orElse: () => seriesList.first,
       );
       print('Target series: ${series.seriesDescription} (${series.seriesInstanceUID})');
