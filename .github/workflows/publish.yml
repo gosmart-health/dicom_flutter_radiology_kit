@@ -13,16 +13,16 @@ jobs:
       id-token: write # Mandatory for pub.dev OIDC automated authentication
     runs-on: ubuntu-latest
 
-    services:
-      dicom-mock-server:
-        image: imanabu/dicom-py-mock-server:latest
-        ports:
-          - 8000:8000
-          - 11112:11112
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Start DICOM Mock Server
+        run: |
+          docker run -d --name dicom-mock-server --platform linux/arm64 -p 8000:8000 -p 11112:11112 imanabu/dicom-py-mock-server:latest
 
       - name: Set up Flutter SDK
         uses: subosito/flutter-action@v2
