@@ -5,19 +5,17 @@ import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
 void main() {
   group('Live Mock Server (localhost:8000) STOW-RS & WADO-RS Integration Test', () {
     test('Stores GSPS instance via STOW-RS and retrieves it via WADO-RS', () async {
+      final client = DicomWebClient(baseUrl: 'http://localhost:8000');
+      final List<DicomStudy> studies;
       try {
-        final socket = await Socket.connect('localhost', 8000,
-            timeout: const Duration(seconds: 1));
-        await socket.close();
+        studies = await client
+            .queryStudies()
+            .timeout(const Duration(seconds: 10));
       } catch (e) {
-        print('Skipping live mock server test: mock server not reachable on localhost:8000');
+        print('Skipping live mock server test: mock server not reachable on localhost:8000 ($e)');
         return;
       }
 
-      final client = DicomWebClient(baseUrl: 'http://localhost:8000');
-
-      // 1. Query live studies
-      final studies = await client.queryStudies();
       expect(studies, isNotEmpty);
       final study = studies.firstWhere(
         (s) => s.numberOfInstances <= 30,

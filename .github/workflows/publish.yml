@@ -38,15 +38,16 @@ jobs:
 
       - name: Verify Mock Server
         run: |
-          echo "Waiting for DICOM mock server..."
-          for i in $(seq 1 30); do
-            if (echo > /dev/tcp/localhost/8000) 2>/dev/null && (echo > /dev/tcp/localhost/11112) 2>/dev/null; then
-              echo "DICOM mock server is ready on ports 8000 and 11112!"
+          echo "Waiting for DICOM mock server to be ready..."
+          for i in $(seq 1 60); do
+            if curl -s -f http://localhost:8000/dicomweb/studies > /dev/null; then
+              echo "DICOM mock server is ready and responding on port 8000!"
               exit 0
             fi
-            sleep 1
+            sleep 2
           done
-          echo "Notice: Mock server not detected on ports 8000 & 11112 after 30s"
+          echo "Notice: Mock server not responding after 120s"
+          docker logs dicom-mock-server || true
 
       - name: Run Tests
         run: flutter test
