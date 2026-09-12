@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dicom_flutter_radiology_kit/dicom_flutter_radiology_kit.dart';
-import 'dart:io';
 
 void main() {
   group('Live Mock Server (localhost:8000) Integration Test', () {
