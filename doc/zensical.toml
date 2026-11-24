@@ -1,0 +1,10 @@
+[project]
+site_name = "DICOM Flutter Radiology Kit"
+site_url = "https://gosmart.health/docs/dicom_flutter_radiology_kit/"
+repo_url = "https://github.com/gosmart-health/dicom_flutter_radiology_kit"
+docs_dir = "zensical"
+site_dir = "site"
+nav = [
+  { "Home" = "index.md" },
+  { "DICOM Conformance Statement" = "dicom_conformance_statement.md" },
+]

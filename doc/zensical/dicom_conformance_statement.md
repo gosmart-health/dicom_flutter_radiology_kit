@@ -61,7 +61,7 @@ The application implements a DICOMweb Service Class User (SCU) interface support
 - [3. Introduction](#3-introduction)
   - [3.1 Revision History](#31-revision-history)
   - [3.2 Audience](#32-audience)
-  - [3.3 Remarks](#33-remarks)
+  - [3.3 Remarks](#33-remarks-clinical-validation-disclaimer)
   - [3.4 Definitions, Terms, and Abbreviations](#34-definitions-terms-and-abbreviations)
   - [3.5 Normative References](#35-normative-references)
 - [4. Networking](#4-networking)
@@ -77,9 +77,9 @@ The application implements a DICOMweb Service Class User (SCU) interface support
 - [8. Annexes](#8-annexes)
   - [Annex A: Supported Storage SOP Classes (SCU)](#annex-a-supported-storage-sop-classes-scu)
   - [Annex B: Grayscale Softcopy Presentation State (GSPS) Conformance](#annex-b-grayscale-softcopy-presentation-state-gsps-conformance)
-  - [Annex C: Transformation & Display Pipeline Conformance](#annex-c-transformation--display-pipeline-conformance)
-  - [Annex D: Clinical Measurement & Calibration Conformance](#annex-d-clinical-measurement--calibration-conformance)
-  - [Annex E: DICOM Data Dictionary & Element Dump Conformance](#annex-e-dicom-data-dictionary--element-dump-conformance)
+  - [Annex C: Transformation & Display Pipeline Conformance](#annex-c-transformation-display-pipeline-conformance)
+  - [Annex D: Clinical Measurement & Calibration Conformance](#annex-d-clinical-measurement-calibration-conformance)
+  - [Annex E: DICOM Data Dictionary & Element Dump Conformance](#annex-e-dicom-data-dictionary-element-dump-conformance)
 
 ---
 

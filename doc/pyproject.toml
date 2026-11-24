@@ -1,0 +1,13 @@
+[project]
+name = "dicom-flutter-radiology-kit-docs"
+version = "0.1.0"
+description = "Documentation for DICOM Flutter Radiology Kit"
+requires-python = ">=3.10"
+dependencies = ["zensical>=0.0.48,<1"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.system.id="pyproject.toml" type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$/doc">
+      <sourceFolder url="file://$MODULE_DIR$/doc/src" />
+      <excludeFolder url="file://$MODULE_DIR$/doc/.venv" />
+    </content>
+    <orderEntry type="jdk" jdkName="~/development/dicom-fhir/dicom-flutter/dicom_flutter_radiology_kit/doc/.venv" jdkType="Python SDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
